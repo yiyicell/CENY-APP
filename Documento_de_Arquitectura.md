@@ -27,6 +27,7 @@ Condiciones que no se pueden cambiar y limitan las decisiones de arquitectura.
 | Normativa | Manejo de datos financieros personales | Requiere confidencialidad por usuario (autenticación) y respeto a políticas de privacidad del proveedor externo (Supabase). |
 
 ## 3. Contexto y Alcance del Sistema
+![Diagrama de Contexto y Alcance](Diagramas/contexto.png)
 
 ### 3.1 Fuera de alcance (versión 1)
 *   Conexión bancaria automática.
@@ -50,7 +51,7 @@ Se decidió delegar autenticación y base de datos administrada a Supabase, prio
 Se optó por reglas financieras conocidas (50/30/20) en lugar de Machine Learning, dado el plazo corto del proyecto y la falta de datos de entrenamiento disponibles.
 
 ## 5. Vista de Bloques de Construcción
-*(Los diagramas de arquitectura se encuentran en la carpeta /Diagramas del repositorio)*
+![Vista de Bloques de Construcción](Diagramas/bloques.png)
 
 ## 6. Vista de Runtime
 1. Usuario ingresa un gasto en la App Móvil ($50.000 en "Comida").
