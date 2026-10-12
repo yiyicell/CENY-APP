@@ -1,0 +1,80 @@
+Table usuarios {
+  id uuid [pk, note: 'Es el mismo de Supabase Auth']
+  nombre text [not null]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Enum prioridad {
+  alta
+  media
+  baja
+}
+
+Table categorias {
+  id uuid [pk]
+  nombre text [not null]
+  prioridad prioridad [not null]
+  usuario_id uuid [ref: > usuarios.id, delete: cascade]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table prioridades_personalizadas {
+  usuario_id uuid [ref: > usuarios.id, not null, delete: cascade]
+  categoria_id uuid [ref: > categorias.id, not null, delete: cascade]
+  prioridad prioridad [not null]
+  creado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    (usuario_id, categoria_id) [pk]
+  }
+}
+
+Enum tipo_frecuencia {
+  mensual
+  quincenal
+}
+
+Enum estado_meta {
+  por_cumplir
+  no_cumplido
+  cumplido
+}
+
+Table metas {
+  id uuid [pk]
+  usuario_id uuid [ref: > usuarios.id, not null, delete: cascade]
+  valor_objetivo numeric(12,2) [not null]
+  estado estado_meta [not null, default: 'por_cumplir']
+  nombre text [not null]
+  frecuencia_ahorro tipo_frecuencia [not null]
+  fecha_objetivo date [not null]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table aportes {
+  id uuid [pk]
+  meta_id uuid [ref: > metas.id, not null, delete: cascade]
+  valor numeric(12,2) [not null]
+  fecha_aporte date [not null]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table ingresos {
+  id uuid [pk]
+  usuario_id uuid [ref: > usuarios.id, not null, delete: cascade]
+  descripcion text
+  valor numeric(12,2) [not null]
+  fecha_ingreso date [not null]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table gastos {
+  id uuid [pk]
+  usuario_id uuid [ref: > usuarios.id, not null, delete: cascade]
+  categoria_id uuid [ref: > categorias.id, not null]
+  valor numeric(12,2) [not null]
+  fecha_gasto date [not null]
+  descripcion text
+  frecuencia tipo_frecuencia
+  creado_en timestamptz [not null, default: `now()`]
+}

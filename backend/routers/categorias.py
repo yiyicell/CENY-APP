@@ -1,18 +1,13 @@
-from fastapi import APIRouter, HTTPException
-from repositories.database import supabase
+from fastapi import APIRouter, Depends, Header
+from services import gestion_categorias
+from database.database import get_client
 
-router = APIRouter(
-    prefix="/categorias",
-    tags=["Categorias"]
-)
+router = APIRouter()
 
-@router.get('/')
-def obtener_categorias():
-    try:
-        respuesta = supabase.table("categorias").select("*").execute()
-        return respuesta.data
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+def obtener_jwt(authorizacion: str = Header(...)) -> str:
+    return authorizacion.replace("Bearer ", "")
+
+@router.get("/categorias")
+def listar_categorias(jwt: str = Depends(obtener_jwt)):
+    client = get_client()
+    return gestion_categorias.obtener_categorias(client, jwt)
