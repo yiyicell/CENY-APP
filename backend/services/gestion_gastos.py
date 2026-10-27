@@ -10,6 +10,8 @@ def registrar_gasto(client, jwt: str, datos: dict):
     datos_insert = dict(datos)
     if "fecha_gasto" in datos_insert and isinstance(datos_insert["fecha_gasto"], date):
         datos_insert["fecha_gasto"] = datos_insert["fecha_gasto"].isoformat()
+    elif "fecha_gasto" in datos_insert:
+        datos_insert["fecha_gasto"] = str(datos_insert["fecha_gasto"])
     if "valor" in datos_insert:
         datos_insert["valor"] = float(datos_insert["valor"])
     if "categoria_id" in datos_insert:

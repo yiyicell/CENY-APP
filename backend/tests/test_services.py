@@ -10,9 +10,37 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from services.gestion_metas import calcular_metricas_meta
+from services.gestion_ingreso import registrar_ingreso
 from services.sugerir_gasto import evaluar_gasto
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
+
+class TestGestionIngreso(unittest.TestCase):
+
+    @patch("repositories.ingresos.crear_ingreso")
+    def test_registrar_ingreso_serializacion(self, mock_crear):
+        mock_crear.return_value = {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "valor": 1500000.0,
+            "fecha_ingreso": "2026-10-27",
+            "descripcion": "Salario"
+        }
+        client_mock = MagicMock()
+        datos_entrada = {
+            "valor": Decimal("1500000.00"),
+            "fecha_ingreso": date(2026, 10, 27),
+            "descripcion": "Salario"
+        }
+        res = registrar_ingreso(client_mock, "fake-jwt", datos_entrada)
+        mock_crear.assert_called_once()
+        args, kwargs = mock_crear.call_args
+        datos_guardados = args[2]
+        # Verificar que fecha_ingreso sea string ISO y valor sea float
+        self.assertIsInstance(datos_guardados["fecha_ingreso"], str)
+        self.assertEqual(datos_guardados["fecha_ingreso"], "2026-10-27")
+        self.assertIsInstance(datos_guardados["valor"], float)
+        self.assertEqual(datos_guardados["valor"], 1500000.0)
 
 class TestGestionMetas(unittest.TestCase):
 

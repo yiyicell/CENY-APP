@@ -59,6 +59,8 @@ def registrar_meta(client, jwt: str, datos: dict) -> dict:
     datos_insert = dict(datos)
     if "fecha_objetivo" in datos_insert and isinstance(datos_insert["fecha_objetivo"], date):
         datos_insert["fecha_objetivo"] = datos_insert["fecha_objetivo"].isoformat()
+    elif "fecha_objetivo" in datos_insert:
+        datos_insert["fecha_objetivo"] = str(datos_insert["fecha_objetivo"])
     if "valor_objetivo" in datos_insert:
         datos_insert["valor_objetivo"] = float(datos_insert["valor_objetivo"])
     if "frecuencia_ahorro" in datos_insert:
@@ -82,6 +84,8 @@ def registrar_aporte(client, jwt: str, meta_id: str, datos: dict) -> dict:
     datos_insert["meta_id"] = meta_id
     if "fecha_aporte" in datos_insert and isinstance(datos_insert["fecha_aporte"], date):
         datos_insert["fecha_aporte"] = datos_insert["fecha_aporte"].isoformat()
+    elif "fecha_aporte" in datos_insert:
+        datos_insert["fecha_aporte"] = str(datos_insert["fecha_aporte"])
     if "valor" in datos_insert:
         datos_insert["valor"] = float(datos_insert["valor"])
         
