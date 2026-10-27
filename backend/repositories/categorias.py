@@ -10,16 +10,32 @@ def asegurar_categorias_por_defecto(client: Client, jwt: str, user_id: str):
     """
     try:
         client.postgrest.auth(jwt)
-        propias = client.table("categorias").select("id").eq("usuario_id", user_id).execute()
-        if not propias.data:
-            cats = [
-                {"id": str(uuid.uuid4()), "usuario_id": user_id, "nombre": "Alimentación", "prioridad": "alta"},
-                {"id": str(uuid.uuid4()), "usuario_id": user_id, "nombre": "Transporte", "prioridad": "alta"},
-                {"id": str(uuid.uuid4()), "usuario_id": user_id, "nombre": "Vivienda", "prioridad": "alta"},
-                {"id": str(uuid.uuid4()), "usuario_id": user_id, "nombre": "Salud", "prioridad": "alta"},
-                {"id": str(uuid.uuid4()), "usuario_id": user_id, "nombre": "Ocio", "prioridad": "baja"},
-            ]
-            client.table("categorias").insert(cats).execute()
+        nombres_esperados = {
+            "Alimentación": "alta",
+            "Transporte": "alta",
+            "Vivienda": "alta",
+            "Salud": "alta",
+            "Ocio": "baja",
+        }
+        existentes = (
+            client.table("categorias")
+            .select("nombre")
+            .eq("usuario_id", user_id)
+            .execute()
+        )
+        nombres_existentes = {c["nombre"] for c in (existentes.data or [])}
+
+        faltantes = []
+        for nombre, prioridad in nombres_esperados.items():
+            if nombre not in nombres_existentes:
+                faltantes.append({
+                    "id": str(uuid.uuid4()),
+                    "usuario_id": user_id,
+                    "nombre": nombre,
+                    "prioridad": prioridad,
+                })
+        if faltantes:
+            client.table("categorias").insert(faltantes).execute()
     except Exception:
         pass
 

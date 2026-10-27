@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,21 @@ import {
   Alert,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
 import { registrarGastoAPI, obtenerCategoriasAPI } from "@/services/api";
 
-type Categoria = { id: string; nombre: string };
+type Categoria = { id: string; nombre: string; prioridad?: string };
+
+function generarUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export default function NuevoGastoScreen() {
   const router = useRouter();
@@ -26,26 +34,69 @@ export default function NuevoGastoScreen() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    async function cargarCategorias() {
-      try {
-        const data = await obtenerCategoriasAPI();
-        if (data && data.length > 0) {
-          setCategorias(data);
-          setCategoriaId(data[0].id);
+  useFocusEffect(
+    useCallback(() => {
+      cargarCategorias();
+    }, [])
+  );
+
+  async function cargarCategorias() {
+    // 1. Intentar cargar desde la API REST de FastAPI
+    try {
+      const data = await obtenerCategoriasAPI();
+      if (Array.isArray(data) && data.length > 1) {
+        setCategorias(data);
+        if (!categoriaId) setCategoriaId(data[0].id);
+        return;
+      }
+    } catch (e) {
+      // Continuar con Supabase
+    }
+
+    // 2. Consultar directamente en Supabase
+    const { data: categoriasDB } = await supabase
+      .from("categorias")
+      .select("id, nombre, prioridad");
+
+    if (categoriasDB && categoriasDB.length > 1) {
+      setCategorias(categoriasDB);
+      if (!categoriaId) setCategoriaId(categoriasDB[0].id);
+      return;
+    }
+
+    // 3. Si solo existe 'Otros' (o ninguna), inicializar automáticamente las categorías estándar para el usuario
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        const uid = userData.user.id;
+        const categoriasPorDefecto = [
+          { id: generarUUID(), nombre: "Alimentación", prioridad: "alta", usuario_id: uid },
+          { id: generarUUID(), nombre: "Transporte", prioridad: "alta", usuario_id: uid },
+          { id: generarUUID(), nombre: "Vivienda", prioridad: "alta", usuario_id: uid },
+          { id: generarUUID(), nombre: "Salud", prioridad: "alta", usuario_id: uid },
+          { id: generarUUID(), nombre: "Ocio", prioridad: "baja", usuario_id: uid },
+        ];
+        await supabase.from("categorias").insert(categoriasPorDefecto);
+
+        const { data: recargadas } = await supabase
+          .from("categorias")
+          .select("id, nombre, prioridad");
+
+        if (recargadas && recargadas.length > 0) {
+          setCategorias(recargadas);
+          setCategoriaId(recargadas[0].id);
           return;
         }
-      } catch (e) {
-        // Fallback a Supabase
       }
-      const { data } = await supabase.from("categorias").select("id, nombre");
-      if (data && data.length > 0) {
-        setCategorias(data);
-        setCategoriaId(data[0].id);
-      }
+    } catch (err) {
+      // Ignorar si falla la inserción
     }
-    cargarCategorias();
-  }, []);
+
+    if (categoriasDB && categoriasDB.length > 0) {
+      setCategorias(categoriasDB);
+      if (!categoriaId) setCategoriaId(categoriasDB[0].id);
+    }
+  }
 
   async function handleGuardar() {
     setError("");
@@ -114,15 +165,27 @@ export default function NuevoGastoScreen() {
           style={{ color: colors.textPrimary }}
           dropdownIconColor={colors.textPrimary}
         >
-          {categorias.map((cat) => (
-            <Picker.Item key={cat.id} label={cat.nombre} value={cat.id} />
-          ))}
+          {categorias.map((cat) => {
+            const etiquetaPrioridad =
+              cat.prioridad === "alta"
+                ? " (Necesidad - 50%)"
+                : cat.prioridad === "baja"
+                ? " (Deseo - 30%)"
+                : "";
+            return (
+              <Picker.Item
+                key={cat.id}
+                label={`${cat.nombre}${etiquetaPrioridad}`}
+                value={cat.id}
+              />
+            );
+          })}
         </Picker>
       </View>
 
       <Text style={styles.label}>DESCRIPCIÓN</Text>
       <TextInput
-        placeholder="Ej. Almuerzo en restaurante"
+        placeholder="Ej. Almuerzo, Transporte de la semana, etc."
         placeholderTextColor={colors.textSecondary}
         value={descripcion}
         onChangeText={setDescripcion}
@@ -148,12 +211,6 @@ export default function NuevoGastoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: 20,
-    paddingTop: 60,
-  },
   title: {
     color: colors.textPrimary,
     fontSize: 22,
