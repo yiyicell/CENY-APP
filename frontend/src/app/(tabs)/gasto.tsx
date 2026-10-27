@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -6,8 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  RefreshControl,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { GastoCard } from "@/components/GastoCard";
@@ -34,12 +35,15 @@ export default function HistorialGastosScreen() {
   const router = useRouter();
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("mes");
   const [busqueda, setBusqueda] = useState("");
 
-  useEffect(() => {
-    cargarGastos();
-  }, [filtro]);
+  useFocusEffect(
+    useCallback(() => {
+      cargarGastos();
+    }, [filtro])
+  );
 
   async function cargarGastos() {
     setCargando(true);
@@ -56,35 +60,33 @@ export default function HistorialGastosScreen() {
 
     if (!error && data) setGastos(data as unknown as Gasto[]);
     setCargando(false);
+    setRefrescando(false);
+  }
+
+  function onRefresh() {
+    setRefrescando(true);
+    cargarGastos();
   }
 
   const gastosFiltrados = gastos.filter((g) =>
-    (g.categorias?.nombre ?? "").toLowerCase().includes(busqueda.toLowerCase()),
+    (g.categorias?.nombre ?? "").toLowerCase().includes(busqueda.toLowerCase())
   );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Historial Gastos</Text>
 
-      {/* 👇 ESTE ES EL BOTÓN NUEVO */}
       <TouchableOpacity
         onPress={() => router.push("/nuevo-gasto")}
-        style={{
-          backgroundColor: colors.success,
-          padding: 12,
-          borderRadius: 30,
-          alignSelf: "flex-end",
-          marginBottom: 12,
-        }}
+        style={styles.btnNuevoGasto}
       >
         <Text style={{ color: colors.background, fontWeight: "700" }}>
           + Nuevo gasto
         </Text>
       </TouchableOpacity>
-      {/* 👆 ESTE ES EL BOTÓN NUEVO */}
 
       <TextInput
-        placeholder="Buscar gasto"
+        placeholder="Buscar gasto..."
         placeholderTextColor={colors.textSecondary}
         value={busqueda}
         onChangeText={setBusqueda}
@@ -107,13 +109,13 @@ export default function HistorialGastosScreen() {
               {opcion === "hoy"
                 ? "Hoy"
                 : opcion === "semana"
-                  ? "Semana"
-                  : "Mes"}
+                ? "Semana"
+                : "Mes"}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
-      {cargando ? (
+      {cargando && !refrescando ? (
         <Text style={{ color: colors.textSecondary, marginTop: 20 }}>
           Cargando...
         </Text>
@@ -121,6 +123,13 @@ export default function HistorialGastosScreen() {
         <FlatList
           data={gastosFiltrados}
           keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refrescando}
+              onRefresh={onRefresh}
+              tintColor={colors.success}
+            />
+          }
           renderItem={({ item }) => (
             <GastoCard
               categoria={item.categorias?.nombre ?? "Sin categoría"}
@@ -152,6 +161,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     marginBottom: 16,
+  },
+  btnNuevoGasto: {
+    backgroundColor: colors.success,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    alignSelf: "flex-end",
+    marginBottom: 14,
   },
   search: {
     backgroundColor: colors.card,

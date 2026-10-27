@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { useFocusEffect } from "expo-router";
 import { colors } from "@/constants/theme";
 import { supabase } from "@/constants/supabase";
 
@@ -9,9 +10,11 @@ export default function ReportesScreen() {
   const [gastosAlta, setGastosAlta] = useState(0);
   const [gastosMediaBaja, setGastosMediaBaja] = useState(0);
 
-  useEffect(() => {
-    cargarReporte();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      cargarReporte();
+    }, [])
+  );
 
   async function cargarReporte() {
     const { data: userData } = await supabase.auth.getUser();

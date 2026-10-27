@@ -37,11 +37,12 @@ export default function RootLayout() {
 
     SplashScreen.hideAsync().catch(() => {});
 
-    const enGrupoTabs = segments[0] === "(tabs)";
+    const rutaActual = segments[0] as string | undefined;
+    const enPantallaAuth = !rutaActual || rutaActual === "index" || rutaActual === "register";
 
-    if (session && !enGrupoTabs) {
+    if (session && enPantallaAuth) {
       router.replace("/(tabs)/home" as any);
-    } else if (!session && enGrupoTabs) {
+    } else if (!session && !enPantallaAuth) {
       router.replace("/");
     }
   }, [session, cargando, segments]);

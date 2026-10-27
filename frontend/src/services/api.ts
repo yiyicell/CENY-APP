@@ -1,10 +1,26 @@
 import { supabase } from "@/constants/supabase";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 
-// Si se define EXPO_PUBLIC_API_URL se usa, de lo contrario localhost para web/emulador
-export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  (Platform.OS === "android" ? "http://10.0.2.2:8000" : "http://localhost:8000");
+function getBaseApiUrl(): string {
+  // Si está definida una IP o URL específica en el entorno, usarla
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    return envUrl;
+  }
+  // En Expo Go (dispositivo físico), extraer la IP de la máquina de hostUri automáticamente
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(":")[0];
+    return `http://${ip}:8000`;
+  }
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:8000";
+  }
+  return envUrl || "http://localhost:8000";
+}
+
+export const API_URL = getBaseApiUrl();
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -45,6 +61,20 @@ export async function registrarGastoAPI(gasto: GastoPayload): Promise<GastoRespo
   return data;
 }
 
+export async function obtenerGastosAPI() {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/gastos`, {
+    method: "GET",
+    headers,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "Error al obtener los gastos");
+  }
+  return data;
+}
+
 export async function obtenerCategoriasAPI() {
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_URL}/categorias`, {
@@ -55,6 +85,20 @@ export async function obtenerCategoriasAPI() {
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.mensaje || "Error al obtener las categorías");
+  }
+  return data;
+}
+
+export async function obtenerIngresosAPI() {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/ingresos`, {
+    method: "GET",
+    headers,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "Error al obtener los ingresos");
   }
   return data;
 }
