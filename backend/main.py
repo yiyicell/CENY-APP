@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from postgrest.exceptions import APIError
 
 from routers.auth import router as router_auth
 from routers.categorias import router as router_categorias
@@ -24,6 +25,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Manejo de excepciones de Supabase / PostgREST (como JWT expirado)
+@app.exception_handler(APIError)
+async def postgrest_exception_handler(request: Request, exc: APIError):
+    error_dict = exc.args[0] if exc.args and isinstance(exc.args[0], dict) else {}
+    code = error_dict.get("code") or ""
+    msg = error_dict.get("message") or str(exc)
+
+    if code == "PGRST303" or "jwt expired" in msg.lower():
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={
+                "error": True,
+                "mensaje": "Tu token de sesión ha expirado (duran 1 hora por seguridad). Por favor genera uno nuevo en POST /auth/login.",
+                "codigo": 401
+            }
+        )
+    if "jwt" in msg.lower():
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={
+                "error": True,
+                "mensaje": "Token de autenticación no válido. Inicia sesión en POST /auth/login.",
+                "codigo": 401
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "error": True,
+            "mensaje": f"Error en base de datos: {msg}",
+            "codigo": 400
+        }
+    )
 
 # Manejo global de excepciones conforme a la Sección 8.2 del Documento de Arquitectura
 @app.exception_handler(StarletteHTTPException)
