@@ -14,19 +14,19 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="home"
-        options={{ title: "Inicio", tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color} size={size} /> }}
+        options={{ title: "Inicio", tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color as string} size={size} /> }}
       />
       <Tabs.Screen
         name="gasto"
-        options={{ title: "Gastos", tabBarIcon: ({ color, size }) => <Ionicons name="list" color={color} size={size} /> }}
+        options={{ title: "Gastos", tabBarIcon: ({ color, size }) => <Ionicons name="list" color={color as string} size={size} /> }}
       />
       <Tabs.Screen
         name="metas"
-        options={{ title: "Metas", tabBarIcon: ({ color, size }) => <Ionicons name="pie-chart" color={color} size={size} /> }}
+        options={{ title: "Metas", tabBarIcon: ({ color, size }) => <Ionicons name="pie-chart" color={color as string} size={size} /> }}
       />
       <Tabs.Screen
         name="reportes"
-        options={{ title: "Reportes", tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" color={color} size={size} /> }}
+        options={{ title: "Reportes", tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" color={color as string} size={size} /> }}
       />
     </Tabs>
   );

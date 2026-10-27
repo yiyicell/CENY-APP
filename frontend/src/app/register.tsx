@@ -110,7 +110,7 @@ export default function RegisterScreen() {
       )}
 
       <TouchableOpacity
-        onPress={handleSubmit(onSubmit)}
+        onPress={() => handleSubmit(onSubmit)()}
         disabled={isSubmitting}
         style={styles.button}
       >
