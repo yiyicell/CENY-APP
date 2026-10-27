@@ -1,17 +1,25 @@
-from enum import Enum
+import sys
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        def __str__(self):
+            return self.value
+
 from pydantic import BaseModel
 from typing import Optional, Any
 
-class PrioridadEnum(str, Enum):
+class PrioridadEnum(StrEnum):
     alta = "alta"
     media = "media"
     baja = "baja"
 
-class TipoFrecuencia(str, Enum):
+class TipoFrecuencia(StrEnum):
     mensual = "mensual"
     quincenal = "quincenal"
 
-class EstadoMeta(str, Enum):
+class EstadoMeta(StrEnum):
     por_cumplir = "por_cumplir"
     no_cumplido = "no_cumplido"
     cumplido = "cumplido"

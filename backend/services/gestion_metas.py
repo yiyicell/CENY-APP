@@ -56,12 +56,17 @@ def obtener_meta_detalle(client, jwt: str, meta_id: str) -> Optional[dict]:
     return calcular_metricas_meta(meta, aportes)
 
 def registrar_meta(client, jwt: str, datos: dict) -> dict:
-    # Convertir date/Decimal a formatos serializables
     datos_insert = dict(datos)
     if "fecha_objetivo" in datos_insert and isinstance(datos_insert["fecha_objetivo"], date):
         datos_insert["fecha_objetivo"] = datos_insert["fecha_objetivo"].isoformat()
     if "valor_objetivo" in datos_insert:
         datos_insert["valor_objetivo"] = float(datos_insert["valor_objetivo"])
+    if "frecuencia_ahorro" in datos_insert:
+        frec = datos_insert["frecuencia_ahorro"]
+        datos_insert["frecuencia_ahorro"] = frec.value if hasattr(frec, "value") else str(frec)
+    if "estado" in datos_insert and datos_insert["estado"] is not None:
+        est = datos_insert["estado"]
+        datos_insert["estado"] = est.value if hasattr(est, "value") else str(est)
         
     nueva_meta = metas_repo.crear_meta(client, jwt, datos_insert)
     if not nueva_meta:
@@ -84,7 +89,6 @@ def registrar_aporte(client, jwt: str, meta_id: str, datos: dict) -> dict:
     if not nuevo_aporte:
         raise ValueError("Error al registrar el aporte en base de datos")
         
-    # Verificar si con el nuevo aporte se cumplió la meta
     aportes = metas_repo.listar_aportes(client, jwt, meta_id=meta_id) or []
     total_ahorrado = sum(float(a.get("valor", 0)) for a in aportes)
     valor_objetivo = float(meta.get("valor_objetivo", 0))

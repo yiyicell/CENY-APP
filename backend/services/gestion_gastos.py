@@ -14,8 +14,12 @@ def registrar_gasto(client, jwt: str, datos: dict):
         datos_insert["valor"] = float(datos_insert["valor"])
     if "categoria_id" in datos_insert:
         datos_insert["categoria_id"] = str(datos_insert["categoria_id"])
-    if "frecuencia" in datos_insert and datos_insert["frecuencia"] is not None:
-        datos_insert["frecuencia"] = str(datos_insert["frecuencia"])
+    if "frecuencia" in datos_insert:
+        frec = datos_insert["frecuencia"]
+        if frec is not None:
+            datos_insert["frecuencia"] = frec.value if hasattr(frec, "value") else str(frec)
+        else:
+            datos_insert.pop("frecuencia", None)
 
     nuevo_gasto = gastos_repo.crear_gasto(client, jwt, datos_insert)
     if not nuevo_gasto:
