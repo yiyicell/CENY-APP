@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
-import { registrarGastoAPI } from "@/services/api";
+import { registrarGastoAPI, obtenerCategoriasAPI } from "@/services/api";
 
 type Categoria = { id: string; nombre: string };
 
@@ -27,15 +27,24 @@ export default function NuevoGastoScreen() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    supabase
-      .from("categorias")
-      .select("id, nombre")
-      .then(({ data }) => {
+    async function cargarCategorias() {
+      try {
+        const data = await obtenerCategoriasAPI();
         if (data && data.length > 0) {
           setCategorias(data);
           setCategoriaId(data[0].id);
+          return;
         }
-      });
+      } catch (e) {
+        // Fallback a Supabase
+      }
+      const { data } = await supabase.from("categorias").select("id, nombre");
+      if (data && data.length > 0) {
+        setCategorias(data);
+        setCategoriaId(data[0].id);
+      }
+    }
+    cargarCategorias();
   }, []);
 
   async function handleGuardar() {
