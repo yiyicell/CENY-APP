@@ -6,12 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Alert,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
+import { registrarGastoAPI } from "@/services/api";
 
 type Categoria = { id: string; nombre: string };
 
@@ -29,9 +31,9 @@ export default function NuevoGastoScreen() {
       .from("categorias")
       .select("id, nombre")
       .then(({ data }) => {
-        if (data) {
+        if (data && data.length > 0) {
           setCategorias(data);
-          if (data.length > 0) setCategoriaId(data[0].id);
+          setCategoriaId(data[0].id);
         }
       });
   }, []);
@@ -49,21 +51,36 @@ export default function NuevoGastoScreen() {
     }
 
     setCargando(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const { error: insertError } = await supabase.from("gastos").insert({
-      usuario_id: userData.user!.id,
-      categoria_id: categoriaId,
-      valor: monto,
-      fecha_gasto: new Date().toISOString().split("T")[0],
-      descripcion: descripcion || null,
-    });
-    setCargando(false);
+    try {
+      // Llamada a la API de FastAPI conforme a la arquitectura y diagrama de secuencia
+      const res = await registrarGastoAPI({
+        categoria_id: categoriaId,
+        valor: monto,
+        fecha_gasto: new Date().toISOString().split("T")[0],
+        descripcion: descripcion || null,
+        frecuencia: null,
+      });
 
-    if (insertError) {
-      setError(insertError.message);
-      return;
+      setCargando(false);
+
+      const mensajeMostrar = res.alerta
+        ? `${res.alerta}\n\n💡 Sugerencia (Regla 50/30/20):\n${res.sugerencia || ""}`
+        : res.sugerencia
+        ? `💡 Sugerencia (Regla 50/30/20):\n${res.sugerencia}`
+        : "Gasto registrado exitosamente.";
+
+      if (Platform.OS === "web") {
+        window.alert(mensajeMostrar);
+        router.back();
+      } else {
+        Alert.alert("Control Financiero - Ceny", mensajeMostrar, [
+          { text: "Entendido", onPress: () => router.back() },
+        ]);
+      }
+    } catch (err: any) {
+      setCargando(false);
+      setError(err.message || "Error al conectar con el servidor de la API");
     }
-    router.back();
   }
 
   return (
@@ -114,7 +131,7 @@ export default function NuevoGastoScreen() {
         style={styles.button}
       >
         <Text style={styles.buttonText}>
-          {cargando ? "Guardando..." : "Guardar Gasto"}
+          {cargando ? "Guardando y analizando..." : "Guardar Gasto"}
         </Text>
       </TouchableOpacity>
     </PantallaFormulario>
