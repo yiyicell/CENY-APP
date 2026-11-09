@@ -11,6 +11,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
 import { registrarAporteAPI } from "@/services/api";
+import { obtenerHoyCO, convertirCOaISO, esFechaValida } from "@/utils/date";
 
 export default function NuevoAporteScreen() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function NuevoAporteScreen() {
     nombre: string;
   }>();
   const [valor, setValor] = useState("");
+  const [fecha, setFecha] = useState(obtenerHoyCO());
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,14 +28,19 @@ export default function NuevoAporteScreen() {
     const monto = Number(valor);
     if (!monto || monto <= 0) return setError("Ingresa un monto válido mayor a 0");
     if (!metaId) return setError("Identificador de meta inválido");
+    if (!esFechaValida(fecha)) {
+      return setError("La fecha debe tener formato DD/MM/AAAA válido (ej: " + obtenerHoyCO() + ")");
+    }
 
     setCargando(true);
     setError("");
 
     try {
+      const fechaISO = convertirCOaISO(fecha);
+
       await registrarAporteAPI(metaId, {
         valor: monto,
-        fecha_aporte: new Date().toISOString().split("T")[0],
+        fecha_aporte: fechaISO,
       });
 
       setCargando(false);
@@ -58,7 +65,7 @@ export default function NuevoAporteScreen() {
       <Text style={styles.title}>Abonar a meta</Text>
       <Text style={styles.subtitulo}>{nombre ? `Meta: ${nombre}` : "Abonar ahorro"}</Text>
 
-      <Text style={styles.label}>MONTO A ABONAR</Text>
+      <Text style={styles.label}>MONTO A ABONAR (COP)</Text>
       <TextInput
         placeholder="$ 0"
         placeholderTextColor={colors.textSecondary}
@@ -67,9 +74,21 @@ export default function NuevoAporteScreen() {
         keyboardType="numeric"
         style={styles.input}
       />
+
+      <Text style={styles.label}>FECHA DEL ABONO (DD/MM/AAAA)</Text>
+      <TextInput
+        placeholder={obtenerHoyCO()}
+        placeholderTextColor={colors.textSecondary}
+        value={fecha}
+        onChangeText={setFecha}
+        autoCapitalize="none"
+        style={styles.input}
+      />
+
       {error ? (
         <Text style={{ color: colors.danger, marginBottom: 12 }}>{error}</Text>
       ) : null}
+
       <TouchableOpacity
         onPress={handleGuardar}
         disabled={cargando}

@@ -11,12 +11,13 @@ import { useRouter } from "expo-router";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
 import { registrarIngresoAPI } from "@/services/api";
+import { obtenerHoyCO, convertirCOaISO, esFechaValida } from "@/utils/date";
 
 export default function NuevoIngresoScreen() {
   const router = useRouter();
   const [valor, setValor] = useState("");
   const [descripcion, setDescripcion] = useState("");
-  const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
+  const [fecha, setFecha] = useState(obtenerHoyCO());
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
@@ -27,16 +28,18 @@ export default function NuevoIngresoScreen() {
       setError("Por favor ingresa un monto válido mayor a 0.");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-      setError("La fecha debe tener el formato AAAA-MM-DD.");
+    if (!esFechaValida(fecha)) {
+      setError("La fecha debe tener formato DD/MM/AAAA válido (ej: " + obtenerHoyCO() + ")");
       return;
     }
 
     setCargando(true);
     try {
+      const fechaISO = convertirCOaISO(fecha);
+
       await registrarIngresoAPI({
         valor: monto,
-        fecha_ingreso: fecha,
+        fecha_ingreso: fechaISO,
         descripcion: descripcion.trim() || null,
       });
 
@@ -65,7 +68,7 @@ export default function NuevoIngresoScreen() {
         Registra tu salario o ingresos extras para actualizar tu saldo y presupuesto.
       </Text>
 
-      <Text style={styles.label}>MONTO DEL INGRESO</Text>
+      <Text style={styles.label}>MONTO DEL INGRESO (COP)</Text>
       <TextInput
         placeholder="$ 0"
         placeholderTextColor={colors.textSecondary}
@@ -84,9 +87,9 @@ export default function NuevoIngresoScreen() {
         style={styles.input}
       />
 
-      <Text style={styles.label}>FECHA (AAAA-MM-DD)</Text>
+      <Text style={styles.label}>FECHA DEL INGRESO (DD/MM/AAAA)</Text>
       <TextInput
-        placeholder="AAAA-MM-DD"
+        placeholder={obtenerHoyCO()}
         placeholderTextColor={colors.textSecondary}
         value={fecha}
         onChangeText={setFecha}

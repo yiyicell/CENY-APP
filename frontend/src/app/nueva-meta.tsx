@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
 import { registrarMetaAPI } from "@/services/api";
+import { convertirCOaISO, esFechaValida } from "@/utils/date";
 
 export default function NuevaMetaScreen() {
   const router = useRouter();
@@ -27,19 +28,21 @@ export default function NuevaMetaScreen() {
     if (!nombre.trim()) return setError("Por favor ingresa un nombre para la meta");
     if (!valor || valor <= 0)
       return setError("Ingresa un valor objetivo válido mayor a 0");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha))
-      return setError("La fecha debe tener el formato AAAA-MM-DD (ej: 2026-12-31)");
+    if (!esFechaValida(fecha))
+      return setError("La fecha debe tener formato DD/MM/AAAA válido (ej: 31/12/2026)");
 
     setCargando(true);
     setError("");
 
     try {
+      const fechaISO = convertirCOaISO(fecha);
+
       // Registrar mediante la API REST de FastAPI
       const metaCreada = await registrarMetaAPI({
         nombre: nombre.trim(),
         valor_objetivo: valor,
         frecuencia_ahorro: frecuencia,
-        fecha_objetivo: fecha,
+        fecha_objetivo: fechaISO,
       });
 
       setCargando(false);
@@ -69,7 +72,7 @@ export default function NuevaMetaScreen() {
     <PantallaFormulario>
       <Text style={styles.title}>Nueva Meta de Ahorro</Text>
       <Text style={styles.subtitulo}>
-        Define un objetivo y fecha límite. Calcularemos automáticamente tu cuota de ahorro recomendada.
+        Define un objetivo y fecha límite. Calcularemos automáticamente tu cuota de ahorro recomendada y le haremos seguimiento.
       </Text>
 
       <Text style={styles.label}>NOMBRE DE LA META</Text>
@@ -81,7 +84,7 @@ export default function NuevaMetaScreen() {
         style={styles.input}
       />
 
-      <Text style={styles.label}>VALOR OBJETIVO</Text>
+      <Text style={styles.label}>VALOR OBJETIVO (COP)</Text>
       <TextInput
         placeholder="$ 0"
         placeholderTextColor={colors.textSecondary}
@@ -127,9 +130,9 @@ export default function NuevaMetaScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.label}>FECHA OBJETIVO (AAAA-MM-DD)</Text>
+      <Text style={styles.label}>FECHA LÍMITE (DD/MM/AAAA)</Text>
       <TextInput
-        placeholder="2026-12-31"
+        placeholder="31/12/2026"
         placeholderTextColor={colors.textSecondary}
         value={fecha}
         onChangeText={setFecha}

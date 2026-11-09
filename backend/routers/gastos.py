@@ -14,6 +14,11 @@ def listar_gastos(jwt: str = Depends(obtener_jwt)):
     client = get_client()
     return gestion_gastos.obtener_gastos(client, jwt)
 
+@router.get("/gastos/analisis")
+def obtener_analisis_gastos(jwt: str = Depends(obtener_jwt)):
+    client = get_client()
+    return gestion_gastos.obtener_analisis(client, jwt)
+
 @router.post("/gastos", response_model=GastoConSugerenciaResponse, status_code=status.HTTP_201_CREATED)
 def crear_gasto(gasto: GastoCreate, jwt: str = Depends(obtener_jwt)):
     client = get_client()

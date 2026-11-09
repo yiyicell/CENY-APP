@@ -8,7 +8,10 @@ def _parsear_fecha(valor) -> date:
     if isinstance(valor, date):
         return valor
     if isinstance(valor, str):
-        return datetime.strptime(valor, "%Y-%m-%d").date()
+        try:
+            return datetime.strptime(valor.split("T")[0], "%Y-%m-%d").date()
+        except Exception:
+            pass
     return date.today()
 
 def calcular_metricas_meta(meta: dict, aportes: List[dict]) -> dict:
@@ -23,9 +26,32 @@ def calcular_metricas_meta(meta: dict, aportes: List[dict]) -> dict:
     
     hoy = date.today()
     fecha_obj = _parsear_fecha(meta.get("fecha_objetivo"))
+    fecha_creado = _parsear_fecha(meta.get("creado_en", hoy.isoformat()))
     frecuencia = str(meta.get("frecuencia_ahorro", "mensual")).lower()
     
+    dias_totales = max(1, (fecha_obj - fecha_creado).days)
     dias_restantes = (fecha_obj - hoy).days
+    dias_transcurridos = max(0, (hoy - fecha_creado).days)
+    
+    # Ritmo temporal esperado (%)
+    ritmo_esperado = min(100.0, max(0.0, round((dias_transcurridos / dias_totales) * 100, 1)))
+    monto_ideal_a_hoy = round(valor_objetivo * (ritmo_esperado / 100.0), 2)
+    diferencia_ritmo = round(total_ahorrado - monto_ideal_a_hoy, 2)
+    
+    if total_ahorrado >= valor_objetivo or meta.get("estado") == "cumplido":
+        estado_seguimiento = "cumplida"
+        mensaje_seguimiento = "¡Meta cumplida exitosamente! 🎉"
+    elif dias_restantes <= 0:
+        estado_seguimiento = "vencida"
+        mensaje_seguimiento = "La fecha objetivo ha pasado. Puedes seguir aportando para completarla."
+    elif progreso >= ritmo_esperado:
+        estado_seguimiento = "al_dia"
+        mensaje_seguimiento = "¡Excelente ritmo! Vas según lo programado para alcanzar tu objetivo a tiempo 🚀"
+    else:
+        estado_seguimiento = "atrasado"
+        diferencia_abs = abs(diferencia_ritmo)
+        mensaje_seguimiento = f"Llevas un retraso de ${diferencia_abs:,.0f} respecto al cronograma ideal."
+
     if dias_restantes <= 0:
         periodos_restantes = 1
     else:
@@ -40,7 +66,18 @@ def calcular_metricas_meta(meta: dict, aportes: List[dict]) -> dict:
     meta_con_metricas["progreso_porcentaje"] = progreso
     meta_con_metricas["cuota_sugerida"] = cuota_sugerida
     meta_con_metricas["periodos_restantes"] = periodos_restantes
-    meta_con_metricas["aportes"] = aportes_meta
+    meta_con_metricas["dias_restantes"] = max(0, dias_restantes)
+    meta_con_metricas["dias_totales"] = dias_totales
+    meta_con_metricas["ritmo_esperado_porcentaje"] = ritmo_esperado
+    meta_con_metricas["monto_ideal_a_hoy"] = monto_ideal_a_hoy
+    meta_con_metricas["diferencia_ritmo"] = diferencia_ritmo
+    meta_con_metricas["estado_seguimiento"] = estado_seguimiento
+    meta_con_metricas["mensaje_seguimiento"] = mensaje_seguimiento
+    meta_con_metricas["aportes"] = sorted(
+        aportes_meta,
+        key=lambda x: str(x.get("fecha_aporte", "")),
+        reverse=True
+    )
     return meta_con_metricas
 
 def obtener_metas(client, jwt: str) -> List[dict]:

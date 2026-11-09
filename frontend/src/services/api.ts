@@ -44,6 +44,8 @@ export interface GastoResponse {
   gasto: any;
   sugerencia?: string | null;
   alerta?: string | null;
+  es_gasto_hormiga?: boolean;
+  es_innecesario?: boolean;
 }
 
 export async function registrarGastoAPI(gasto: GastoPayload): Promise<GastoResponse> {
@@ -152,6 +154,20 @@ export async function registrarMetaAPI(meta: {
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.mensaje || "Error al crear la meta");
+  }
+  return data;
+}
+
+export async function obtenerAnalisisAPI() {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/gastos/analisis`, {
+    method: "GET",
+    headers,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "Error al obtener el análisis algorítmico");
   }
   return data;
 }

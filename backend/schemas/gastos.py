@@ -28,3 +28,5 @@ class GastoConSugerenciaResponse(BaseModel):
     gasto: GastoResponse
     sugerencia: Optional[str] = None
     alerta: Optional[str] = None
+    es_gasto_hormiga: bool = False
+    es_innecesario: bool = False

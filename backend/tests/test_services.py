@@ -11,10 +11,49 @@ if backend_dir not in sys.path:
 
 from services.gestion_metas import calcular_metricas_meta
 from services.gestion_ingreso import registrar_ingreso
-from services.sugerir_gasto import evaluar_gasto
+from services.sugerir_gasto import evaluar_gasto, _es_gasto_hormiga, obtener_analisis_algoritmico
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from main import app
+
+class TestSugerirGasto(unittest.TestCase):
+
+    def test_deteccion_gasto_hormiga_por_palabra(self):
+        # Tinto o café menor a umbral
+        es_h = _es_gasto_hormiga(4500.0, "Café con pan", "Alimentación", "alta")
+        self.assertTrue(es_h)
+
+    def test_deteccion_gasto_hormiga_por_monto_en_ocio(self):
+        # Monto pequeño en ocio
+        es_h = _es_gasto_hormiga(12000.0, "Entrada arcade", "Ocio", "baja")
+        self.assertTrue(es_h)
+
+    def test_gasto_grande_no_es_hormiga(self):
+        # Arriendo no es hormiga
+        es_h = _es_gasto_hormiga(600000.0, "Arriendo mes", "Vivienda", "alta")
+        self.assertFalse(es_h)
+
+    @patch("repositories.gastos.listar_gastos")
+    @patch("repositories.ingresos.listar_ingreso")
+    @patch("services.gestion_metas.obtener_metas")
+    @patch("repositories.categorias.listar_categorias")
+    def test_evaluar_gasto_alerta_hormiga(self, mock_cats, mock_metas, mock_ingresos, mock_gastos):
+        mock_cats.return_value = [
+            {"id": "cat1", "nombre": "Ocio", "prioridad": "baja"}
+        ]
+        mock_gastos.return_value = [
+            {"valor": 5000, "descripcion": "Café", "categoria_id": "cat1"},
+            {"valor": 8000, "descripcion": "Snack", "categoria_id": "cat1"}
+        ]
+        mock_ingresos.return_value = [{"valor": 1000000}]
+        mock_metas.return_value = [
+            {"id": "m1", "nombre": "Viaje", "cuota_sugerida": 100000, "estado": "por_cumplir"}
+        ]
+
+        nuevo_gasto = {"valor": 6000, "descripcion": "Gaseosa", "categoria_id": "cat1"}
+        res = evaluar_gasto(MagicMock(), "fake-jwt", nuevo_gasto)
+        self.assertTrue(res["es_gasto_hormiga"])
+        self.assertIn("Aviso de Gasto Hormiga", res["alerta"])
 
 class TestGestionIngreso(unittest.TestCase):
 

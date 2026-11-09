@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from "react-native";
 import { colors } from "@/constants/theme";
+import { formatearFechaCO } from "@/utils/date";
 
 type GastoCardProps = {
   categoria: string;
@@ -16,7 +17,7 @@ export function GastoCard({ categoria, fecha, valor, icono = "💸" }: GastoCard
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.categoria}>{categoria}</Text>
-        <Text style={styles.fecha}>{fecha}</Text>
+        <Text style={styles.fecha}>{formatearFechaCO(fecha)}</Text>
       </View>
       <Text style={styles.valor}>- ${valor.toLocaleString("es-CO")}</Text>
     </View>
@@ -24,9 +25,36 @@ export function GastoCard({ categoria, fecha, valor, icono = "💸" }: GastoCard
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: "row", alignItems: "center", backgroundColor: colors.card, borderRadius: 14, padding: 14, marginBottom: 10 },
-  iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + "33", alignItems: "center", justifyContent: "center", marginRight: 12 },
-  categoria: { color: colors.textPrimary, fontWeight: "600", fontSize: 15 },
-  fecha: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  valor: { color: colors.danger, fontWeight: "700", fontSize: 15 },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + "33",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  categoria: {
+    color: colors.textPrimary,
+    fontWeight: "600",
+    fontSize: 15,
+  },
+  fecha: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  valor: {
+    color: colors.danger,
+    fontWeight: "700",
+    fontSize: 15,
+  },
 });

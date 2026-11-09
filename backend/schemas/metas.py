@@ -45,6 +45,13 @@ class MetaResponse(MetaBase):
     progreso_porcentaje: float = 0.0
     cuota_sugerida: Optional[Decimal] = None
     periodos_restantes: Optional[int] = None
+    dias_restantes: Optional[int] = None
+    dias_totales: Optional[int] = None
+    ritmo_esperado_porcentaje: Optional[float] = None
+    monto_ideal_a_hoy: Optional[Decimal] = None
+    diferencia_ritmo: Optional[Decimal] = None
+    estado_seguimiento: Optional[str] = None
+    mensaje_seguimiento: Optional[str] = None
     aportes: Optional[List[AporteResponse]] = None
 
     class Config:

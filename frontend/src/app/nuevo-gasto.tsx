@@ -14,6 +14,7 @@ import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
 import { registrarGastoAPI, obtenerCategoriasAPI } from "@/services/api";
+import { obtenerHoyCO, convertirCOaISO, esFechaValida } from "@/utils/date";
 
 type Categoria = { id: string; nombre: string; prioridad?: string };
 
@@ -25,12 +26,26 @@ function generarUUID(): string {
   });
 }
 
+const PALABRAS_HORMIGA = [
+  "café", "cafe", "tinto", "snack", "dulce", "golosina", "chicle",
+  "gaseosa", "empanada", "propina", "domicilio", "mecato", "antojo",
+  "cerveza", "cigarro", "helado", "postre"
+];
+
+const SUGERENCIAS_RAPIDAS = [
+  { nombre: "Almuerzo", monto: "15000", catNombre: "Alimentación" },
+  { nombre: "Transporte", monto: "3200", catNombre: "Transporte" },
+  { nombre: "Café / Snack", monto: "5000", catNombre: "Ocio" },
+  { nombre: "Supermercado", monto: "80000", catNombre: "Alimentación" },
+];
+
 export default function NuevoGastoScreen() {
   const router = useRouter();
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriaId, setCategoriaId] = useState("");
   const [valor, setValor] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [fecha, setFecha] = useState(obtenerHoyCO());
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,7 +56,6 @@ export default function NuevoGastoScreen() {
   );
 
   async function cargarCategorias() {
-    // 1. Intentar cargar desde la API REST de FastAPI
     try {
       const data = await obtenerCategoriasAPI();
       if (Array.isArray(data) && data.length > 1) {
@@ -53,7 +67,6 @@ export default function NuevoGastoScreen() {
       // Continuar con Supabase
     }
 
-    // 2. Consultar directamente en Supabase
     const { data: categoriasDB } = await supabase
       .from("categorias")
       .select("id, nombre, prioridad");
@@ -64,7 +77,6 @@ export default function NuevoGastoScreen() {
       return;
     }
 
-    // 3. Si solo existe 'Otros' (o ninguna), inicializar automáticamente las categorías estándar para el usuario
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
@@ -98,26 +110,50 @@ export default function NuevoGastoScreen() {
     }
   }
 
+  // Detección algorítmica preventiva en vivo de gasto hormiga
+  const montoNum = Number(valor) || 0;
+  const descLimpia = descripcion.toLowerCase();
+  const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId);
+  const esPotencialHormiga =
+    (montoNum > 0 && montoNum <= 25000 && categoriaSeleccionada?.prioridad !== "alta") ||
+    PALABRAS_HORMIGA.some((p) => descLimpia.includes(p));
+
+  function aplicarSugerencia(sug: typeof SUGERENCIAS_RAPIDAS[0]) {
+    setDescripcion(sug.nombre);
+    setValor(sug.monto);
+    const catEncontrada = categorias.find(
+      (c) => c.nombre.toLowerCase() === sug.catNombre.toLowerCase()
+    );
+    if (catEncontrada) {
+      setCategoriaId(catEncontrada.id);
+    }
+  }
+
   async function handleGuardar() {
     setError("");
     const monto = Number(valor);
     if (!monto || monto <= 0) {
-      setError("Ingresa un monto válido");
+      setError("Ingresa un monto válido mayor a 0");
       return;
     }
     if (!categoriaId) {
       setError("Selecciona una categoría");
       return;
     }
+    if (!esFechaValida(fecha)) {
+      setError("La fecha debe tener formato DD/MM/AAAA válido (ej: " + obtenerHoyCO() + ")");
+      return;
+    }
 
     setCargando(true);
     try {
-      // Llamada a la API de FastAPI conforme a la arquitectura y diagrama de secuencia
+      const fechaISO = convertirCOaISO(fecha);
+
       const res = await registrarGastoAPI({
         categoria_id: categoriaId,
         valor: monto,
-        fecha_gasto: new Date().toISOString().split("T")[0],
-        descripcion: descripcion || null,
+        fecha_gasto: fechaISO,
+        descripcion: descripcion.trim() || null,
         frecuencia: null,
       });
 
@@ -146,8 +182,25 @@ export default function NuevoGastoScreen() {
   return (
     <PantallaFormulario>
       <Text style={styles.title}>Nuevo Gasto</Text>
+      <Text style={styles.subtitulo}>
+        Registra tu compra para evaluar su impacto en tu presupuesto 50/30/20 y tus metas.
+      </Text>
 
-      <Text style={styles.label}>MONTO</Text>
+      {/* Sugerencias Rápidas */}
+      <Text style={styles.label}>SUGERENCIAS FRECUENTES</Text>
+      <View style={styles.sugerenciasRow}>
+        {SUGERENCIAS_RAPIDAS.map((sug) => (
+          <TouchableOpacity
+            key={sug.nombre}
+            onPress={() => aplicarSugerencia(sug)}
+            style={styles.chipSugerencia}
+          >
+            <Text style={styles.chipTexto}>{sug.nombre}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.label}>MONTO (COP)</Text>
       <TextInput
         placeholder="$ 0"
         placeholderTextColor={colors.textSecondary}
@@ -171,7 +224,7 @@ export default function NuevoGastoScreen() {
                 ? " (Necesidad - 50%)"
                 : cat.prioridad === "baja"
                 ? " (Deseo - 30%)"
-                : "";
+                : " (Secundario)";
             return (
               <Picker.Item
                 key={cat.id}
@@ -183,15 +236,34 @@ export default function NuevoGastoScreen() {
         </Picker>
       </View>
 
+      <Text style={styles.label}>FECHA DEL GASTO (DD/MM/AAAA)</Text>
+      <TextInput
+        placeholder={obtenerHoyCO()}
+        placeholderTextColor={colors.textSecondary}
+        value={fecha}
+        onChangeText={setFecha}
+        autoCapitalize="none"
+        style={styles.input}
+      />
+
       <Text style={styles.label}>DESCRIPCIÓN</Text>
       <TextInput
-        placeholder="Ej. Almuerzo, Transporte de la semana, etc."
+        placeholder="Ej. Almuerzo ejecutivo, Transporte del día, Café"
         placeholderTextColor={colors.textSecondary}
         value={descripcion}
         onChangeText={setDescripcion}
         multiline
-        style={[styles.input, { height: 80, textAlignVertical: "top" }]}
+        style={[styles.input, { height: 75, textAlignVertical: "top" }]}
       />
+
+      {/* Indicador algorítmico en vivo de Gasto Hormiga */}
+      {esPotencialHormiga && (
+        <View style={styles.avisoHormiga}>
+          <Text style={styles.avisoHormigaTexto}>
+            🐜 <Text style={{ fontWeight: "700" }}>Aviso predictivo:</Text> Este gasto parece ser un micro-gasto (gasto hormiga). Reducir estas compras frecuentes te permitirá destinar más dinero a tus metas.
+          </Text>
+        </View>
+      )}
 
       {error ? (
         <Text style={{ color: colors.danger, marginBottom: 12 }}>{error}</Text>
@@ -203,7 +275,7 @@ export default function NuevoGastoScreen() {
         style={styles.button}
       >
         <Text style={styles.buttonText}>
-          {cargando ? "Guardando y analizando..." : "Guardar Gasto"}
+          {cargando ? "Guardando y evaluando..." : "Guardar Gasto"}
         </Text>
       </TouchableOpacity>
     </PantallaFormulario>
@@ -213,15 +285,40 @@ export default function NuevoGastoScreen() {
 const styles = StyleSheet.create({
   title: {
     color: colors.textPrimary,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "700",
-    marginBottom: 20,
+    marginBottom: 4,
+  },
+  subtitulo: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginBottom: 16,
   },
   label: {
     color: colors.textSecondary,
     fontSize: 12,
     marginBottom: 6,
-    marginTop: 4,
+    marginTop: 6,
+    fontWeight: "600",
+  },
+  sugerenciasRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 10,
+  },
+  chipSugerencia: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  chipTexto: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "500",
   },
   input: {
     borderWidth: 1,
@@ -240,6 +337,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     overflow: "hidden",
+  },
+  avisoHormiga: {
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.4)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  avisoHormigaTexto: {
+    color: "#F59E0B",
+    fontSize: 12,
+    lineHeight: 18,
   },
   button: {
     backgroundColor: colors.success,

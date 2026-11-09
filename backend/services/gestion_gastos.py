@@ -33,5 +33,10 @@ def registrar_gasto(client, jwt: str, datos: dict):
         "mensaje": "Gasto registrado correctamente",
         "gasto": nuevo_gasto,
         "sugerencia": eval_resultado.get("sugerencia"),
-        "alerta": eval_resultado.get("alerta")
+        "alerta": eval_resultado.get("alerta"),
+        "es_gasto_hormiga": eval_resultado.get("es_gasto_hormiga", False),
+        "es_innecesario": eval_resultado.get("es_innecesario", False),
     }
+
+def obtener_analisis(client, jwt: str):
+    return sugerir_gasto.obtener_analisis_algoritmico(client, jwt)
