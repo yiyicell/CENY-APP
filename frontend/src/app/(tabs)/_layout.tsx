@@ -18,7 +18,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="gasto"
-        options={{ title: "Gastos", tabBarIcon: ({ color, size }) => <Ionicons name="list" color={color as string} size={size} /> }}
+        options={{ title: "Movimientos", tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal" color={color as string} size={size} /> }}
       />
       <Tabs.Screen
         name="metas"

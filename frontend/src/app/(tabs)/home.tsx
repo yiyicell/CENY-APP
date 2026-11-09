@@ -11,12 +11,20 @@ import { Link, useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { GastoCard } from "@/components/GastoCard";
+import { IngresoCard } from "@/components/IngresoCard";
 
 type Gasto = {
   id: string;
   valor: number;
   fecha_gasto: string;
   categorias: { nombre: string } | null;
+};
+
+type Ingreso = {
+  id: string;
+  valor: number;
+  fecha_ingreso: string;
+  descripcion: string | null;
 };
 
 const iconosPorCategoria: Record<string, string> = {
@@ -32,11 +40,13 @@ export default function HomeScreen() {
   const router = useRouter();
   const [nombre, setNombre] = useState("");
   const [gastosRecientes, setGastosRecientes] = useState<Gasto[]>([]);
+  const [ingresosRecientes, setIngresosRecientes] = useState<Ingreso[]>([]);
   const [totalIngresos, setTotalIngresos] = useState(0);
   const [totalGastos, setTotalGastos] = useState(0);
   const [metasActivas, setMetasActivas] = useState(0);
   const [totalAhorrado, setTotalAhorrado] = useState(0);
   const [refrescando, setRefrescando] = useState(false);
+  const [tabRecientes, setTabRecientes] = useState<"gastos" | "ingresos">("gastos");
 
   useFocusEffect(
     useCallback(() => {
@@ -59,9 +69,13 @@ export default function HomeScreen() {
     // Ingresos
     const { data: ingresos } = await supabase
       .from("ingresos")
-      .select("valor");
+      .select("id, valor, fecha_ingreso, descripcion")
+      .order("fecha_ingreso", { ascending: false });
     const ingTotal = (ingresos || []).reduce((acc, i) => acc + Number(i.valor), 0);
     setTotalIngresos(ingTotal);
+    if (ingresos) {
+      setIngresosRecientes(ingresos.slice(0, 4) as Ingreso[]);
+    }
 
     // Gastos recientes y total gastos
     const { data: gastos } = await supabase
@@ -101,7 +115,8 @@ export default function HomeScreen() {
     cargarDatos();
   }
 
-  const saldoDisponible = totalIngresos - totalGastos;
+  // Saldo libre real disponible para gastar
+  const saldoLibre = totalIngresos - totalGastos - totalAhorrado;
   const porcentajeGastado = totalIngresos > 0 ? Math.round((totalGastos / totalIngresos) * 100) : 0;
 
   return (
@@ -118,7 +133,7 @@ export default function HomeScreen() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.saludo}>Hola{nombre ? `, ${nombre}` : ""}</Text>
-          <Text style={styles.subtitulo}>Aquí está tu resumen financiero</Text>
+          <Text style={styles.subtitulo}>Resumen patrimonial y flujo de fondos</Text>
         </View>
         <TouchableOpacity
           onPress={() => supabase.auth.signOut()}
@@ -128,24 +143,49 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Tarjeta de Saldo Disponible */}
+      {/* Tarjeta de Saldo Disponible Real */}
       <View style={styles.saldoCard}>
-        <Text style={styles.saldoLabel}>Saldo disponible</Text>
+        <View style={styles.saldoHeader}>
+          <Text style={styles.saldoLabel}>Saldo libre para gastar</Text>
+          <View style={styles.badgeReserva}>
+            <Text style={styles.badgeReservaTexto}>Ahorro protegido</Text>
+          </View>
+        </View>
+
         <Text
           style={[
             styles.saldoValor,
-            saldoDisponible < 0 ? { color: colors.danger } : { color: colors.success },
+            saldoLibre < 0 ? { color: colors.danger } : { color: colors.success },
           ]}
         >
-          ${saldoDisponible.toLocaleString("es-CO")}
+          ${saldoLibre.toLocaleString("es-CO")}
         </Text>
+
         <View style={styles.saldoDesglose}>
-          <Text style={styles.desgloseText}>
-            🟢 Ingresos: ${totalIngresos.toLocaleString("es-CO")}
-          </Text>
-          <Text style={styles.desgloseText}>
-            🔴 Gastos: ${totalGastos.toLocaleString("es-CO")}
-          </Text>
+          <View style={styles.desgloseCol}>
+            <Text style={styles.desgloseLabel}>Ingresos</Text>
+            <Text style={[styles.desgloseText, { color: colors.success }]}>
+              +${totalIngresos.toLocaleString("es-CO")}
+            </Text>
+          </View>
+
+          <View style={styles.desgloseDivider} />
+
+          <View style={styles.desgloseCol}>
+            <Text style={styles.desgloseLabel}>Gastos</Text>
+            <Text style={[styles.desgloseText, { color: colors.danger }]}>
+              -${totalGastos.toLocaleString("es-CO")}
+            </Text>
+          </View>
+
+          <View style={styles.desgloseDivider} />
+
+          <View style={styles.desgloseCol}>
+            <Text style={styles.desgloseLabel}>En Metas</Text>
+            <Text style={[styles.desgloseText, { color: "#818CF8" }]}>
+              -${totalAhorrado.toLocaleString("es-CO")}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -186,9 +226,9 @@ export default function HomeScreen() {
           <Text style={styles.miniSubtext}>
             {totalIngresos > 0
               ? porcentajeGastado > 80
-                ? "⚠️ Límite excedido"
-                : "✅ En presupuesto"
-              : "Registra ingresos para evaluar"}
+                ? "Límite en alerta"
+                : "Dentro de límites"
+              : "Registra ingresos"}
           </Text>
         </View>
 
@@ -197,44 +237,107 @@ export default function HomeScreen() {
           <Text style={styles.miniValor}>
             {metasActivas} {metasActivas === 1 ? "activa" : "activas"}
           </Text>
-          <Text style={styles.miniSubtext}>
-            ${totalAhorrado.toLocaleString("es-CO")} ahorrados
+          <Text style={[styles.miniSubtext, { color: "#818CF8", fontWeight: "600" }]}>
+            ${totalAhorrado.toLocaleString("es-CO")} acumulados
           </Text>
         </View>
       </View>
 
-      {/* Historial Reciente */}
+      {/* Selector de Recientes: Gastos vs Ingresos */}
       <View style={styles.recientesHeader}>
-        <Text style={styles.recientesTitle}>Gastos recientes</Text>
-        <Link href="/gasto" style={{ color: colors.primary, fontWeight: "600" }}>
+        <View style={styles.tabsRecientes}>
+          <TouchableOpacity
+            onPress={() => setTabRecientes("gastos")}
+            style={[
+              styles.tabRecienteBtn,
+              tabRecientes === "gastos" && styles.tabRecienteActivo,
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabRecienteTexto,
+                tabRecientes === "gastos" && styles.tabRecienteTextoActivo,
+              ]}
+            >
+              Gastos recientes
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setTabRecientes("ingresos")}
+            style={[
+              styles.tabRecienteBtn,
+              tabRecientes === "ingresos" && styles.tabRecienteActivo,
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabRecienteTexto,
+                tabRecientes === "ingresos" && styles.tabRecienteTextoActivo,
+              ]}
+            >
+              Ingresos recientes
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Link href="/gasto" style={styles.linkVerTodos}>
           Ver todos
         </Link>
       </View>
 
-      {gastosRecientes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={{ color: colors.textSecondary }}>
-            Aún no tienes gastos registrados.
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push("/nuevo-gasto")}
-            style={{ marginTop: 8 }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: "600" }}>
-              Registra tu primer gasto
+      {/* Listado condicional */}
+      {tabRecientes === "gastos" ? (
+        gastosRecientes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={{ color: colors.textSecondary }}>
+              No registras gastos recientes en el período.
             </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={() => router.push("/nuevo-gasto")}
+              style={{ marginTop: 8 }}
+            >
+              <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                + Registrar nuevo gasto
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          gastosRecientes.map((g) => (
+            <GastoCard
+              key={g.id}
+              categoria={g.categorias?.nombre ?? "Sin categoría"}
+              fecha={g.fecha_gasto}
+              valor={g.valor}
+              icono={iconosPorCategoria[g.categorias?.nombre ?? ""] ?? "💸"}
+            />
+          ))
+        )
       ) : (
-        gastosRecientes.map((g) => (
-          <GastoCard
-            key={g.id}
-            categoria={g.categorias?.nombre ?? "Sin categoría"}
-            fecha={g.fecha_gasto}
-            valor={g.valor}
-            icono={iconosPorCategoria[g.categorias?.nombre ?? ""] ?? "💸"}
-          />
-        ))
+        ingresosRecientes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={{ color: colors.textSecondary }}>
+              No registras ingresos recientes en el período.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/nuevo-ingreso")}
+              style={{ marginTop: 8 }}
+            >
+              <Text style={{ color: colors.success, fontWeight: "600" }}>
+                + Registrar nuevo ingreso
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          ingresosRecientes.map((i) => (
+            <IngresoCard
+              key={i.id}
+              descripcion={i.descripcion}
+              fecha={i.fecha_ingreso}
+              valor={i.valor}
+            />
+          ))
+        )
       )}
 
       <View style={{ height: 40 }} />
@@ -263,6 +366,7 @@ const styles = StyleSheet.create({
   subtitulo: {
     color: colors.textSecondary,
     marginTop: 2,
+    fontSize: 13,
   },
   btnSalir: {
     paddingVertical: 6,
@@ -280,28 +384,61 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
+  saldoHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   saldoLabel: {
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: "500",
   },
+  badgeReserva: {
+    backgroundColor: "#6366F122",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#6366F144",
+  },
+  badgeReservaTexto: {
+    color: "#818CF8",
+    fontSize: 11,
+    fontWeight: "600",
+  },
   saldoValor: {
     fontSize: 28,
     fontWeight: "800",
     marginTop: 6,
-    marginBottom: 10,
+    marginBottom: 14,
   },
   saldoDesglose: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
-    paddingTop: 10,
+    paddingTop: 12,
+  },
+  desgloseCol: {
+    flex: 1,
+    alignItems: "center",
+  },
+  desgloseDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.cardBorder,
+  },
+  desgloseLabel: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginBottom: 2,
+    fontWeight: "500",
   },
   desgloseText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
   },
   accionesRow: {
     flexDirection: "row",
@@ -362,17 +499,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  recientesTitle: {
-    color: colors.textPrimary,
-    fontWeight: "700",
-    fontSize: 16,
+  tabsRecientes: {
+    flexDirection: "row",
+    backgroundColor: colors.card,
+    borderRadius: 10,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  tabRecienteBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  tabRecienteActivo: {
+    backgroundColor: colors.primary,
+  },
+  tabRecienteTexto: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  tabRecienteTextoActivo: {
+    color: "#FFFFFF",
+  },
+  linkVerTodos: {
+    color: colors.primary,
+    fontWeight: "600",
+    fontSize: 13,
   },
   emptyState: {
     backgroundColor: colors.card,
-    padding: 20,
+    padding: 22,
     borderRadius: 14,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
 });
