@@ -53,7 +53,7 @@ class TestSugerirGasto(unittest.TestCase):
         nuevo_gasto = {"valor": 6000, "descripcion": "Gaseosa", "categoria_id": "cat1"}
         res = evaluar_gasto(MagicMock(), "fake-jwt", nuevo_gasto)
         self.assertTrue(res["es_gasto_hormiga"])
-        self.assertIn("Aviso de Gasto Hormiga", res["alerta"])
+        self.assertIn("Aviso de Microgasto (Gasto Hormiga)", res["alerta"])
 
 class TestGestionIngreso(unittest.TestCase):
 

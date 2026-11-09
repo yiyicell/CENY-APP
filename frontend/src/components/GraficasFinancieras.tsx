@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
+import Svg, { G, Circle, Text as SvgText } from "react-native-svg";
 import { colors } from "@/constants/theme";
 
 export type CategoriaDesglose = {
@@ -6,7 +7,7 @@ export type CategoriaDesglose = {
   total: number;
   porcentaje: number;
   color: string;
-  icono: string;
+  icono?: string;
   prioridad?: string;
 };
 
@@ -20,13 +21,13 @@ type Props = {
 };
 
 const PALETA_COLORES = [
-  "#10B981", // verde esmeralda
-  "#3B82F6", // azul
-  "#F59E0B", // naranja
-  "#EC4899", // rosa
-  "#8B5CF6", // violeta
-  "#6B7280", // gris
-  "#06B6D4", // cian
+  "#10B981", // Esmeralda
+  "#3B82F6", // Azul
+  "#F59E0B", // Ámbar / Naranja
+  "#EC4899", // Rosa
+  "#8B5CF6", // Violeta
+  "#06B6D4", // Cian
+  "#64748B", // Pizarra / Gris
 ];
 
 export function GraficasFinancieras({
@@ -35,76 +36,139 @@ export function GraficasFinancieras({
   gastosAlta,
   gastosMediaBaja,
   categoriasDesglose,
-  proyeccionFinMes,
 }: Props) {
   const target50 = totalIngresos * 0.5;
   const target30 = totalIngresos * 0.3;
   const target20 = totalIngresos * 0.2;
   const saldoDisponible = totalIngresos - totalGastos;
 
+  // Configuración de la Gráfica de Torta (Donut)
+  const chartSize = 190;
+  const strokeWidth = 26;
+  const radius = (chartSize - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const center = chartSize / 2;
+
+  let cumulativePercent = 0;
+
   return (
     <View style={styles.container}>
-      {/* 1. Gráfica de Distribución Continua (Stacked Bar) */}
+      {/* 1. Gráfica de Torta (Pie / Donut Chart) */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>📊 Distribución Visual de Gastos</Text>
+        <Text style={styles.cardTitle}>Distribución Porcentual (Gráfica de Torta)</Text>
         <Text style={styles.cardSubtitle}>
-          Proporción de tus gastos totales por categoría
+          Participación de cada categoría en el total de egresos ejecutados
         </Text>
 
         {totalGastos === 0 ? (
-          <Text style={styles.emptyText}>No hay gastos registrados aún para graficar.</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              No se registran gastos en este período para graficar.
+            </Text>
+          </View>
         ) : (
-          <>
-            <View style={styles.stackedBar}>
-              {categoriasDesglose.map((cat, index) => {
-                const ancho = Math.max(2, cat.porcentaje);
-                return (
-                  <View
-                    key={cat.nombre}
-                    style={{
-                      width: `${ancho}%`,
-                      backgroundColor: cat.color || PALETA_COLORES[index % PALETA_COLORES.length],
-                      height: "100%",
-                    }}
+          <View style={styles.donutRow}>
+            {/* SVG Circular Donut */}
+            <View style={styles.svgWrapper}>
+              <Svg width={chartSize} height={chartSize}>
+                <G rotation="-90" origin={`${center}, ${center}`}>
+                  {/* Círculo base de fondo */}
+                  <Circle
+                    cx={center}
+                    cy={center}
+                    r={radius}
+                    stroke={colors.cardBorder}
+                    strokeWidth={strokeWidth}
+                    fill="transparent"
                   />
+
+                  {/* Segmentos de la torta */}
+                  {categoriasDesglose.map((cat, index) => {
+                    const sliceLength = (cat.porcentaje / 100) * circumference;
+                    const strokeOffset = -(cumulativePercent / 100) * circumference;
+                    cumulativePercent += cat.porcentaje;
+
+                    const color = cat.color || PALETA_COLORES[index % PALETA_COLORES.length];
+
+                    return (
+                      <Circle
+                        key={cat.nombre}
+                        cx={center}
+                        cy={center}
+                        r={radius}
+                        stroke={color}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={`${sliceLength} ${circumference}`}
+                        strokeDashoffset={strokeOffset}
+                        fill="transparent"
+                        strokeLinecap="butt"
+                      />
+                    );
+                  })}
+                </G>
+
+                {/* Texto central en el agujero de la torta */}
+                <SvgText
+                  x={center}
+                  y={center - 8}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fontWeight="600"
+                  fill={colors.textSecondary}
+                >
+                  TOTAL GASTOS
+                </SvgText>
+                <SvgText
+                  x={center}
+                  y={center + 12}
+                  textAnchor="middle"
+                  fontSize="13"
+                  fontWeight="bold"
+                  fill={colors.textPrimary}
+                >
+                  ${(totalGastos / 1000).toFixed(0)}k
+                </SvgText>
+              </Svg>
+            </View>
+
+            {/* Leyenda lateral con porcentajes */}
+            <View style={styles.donutLegend}>
+              {categoriasDesglose.map((cat, index) => {
+                const color = cat.color || PALETA_COLORES[index % PALETA_COLORES.length];
+                return (
+                  <View key={cat.nombre} style={styles.legendRow}>
+                    <View style={[styles.legendBox, { backgroundColor: color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.legendNombre} numberOfLines={1}>
+                        {cat.nombre}
+                      </Text>
+                      <Text style={styles.legendValor}>
+                        ${cat.total.toLocaleString("es-CO")}
+                      </Text>
+                    </View>
+                    <Text style={styles.legendPorcentaje}>{cat.porcentaje}%</Text>
+                  </View>
                 );
               })}
             </View>
-
-            {/* Leyenda de píldoras con porcentajes */}
-            <View style={styles.legendContainer}>
-              {categoriasDesglose.map((cat, index) => (
-                <View key={cat.nombre} style={styles.legendItem}>
-                  <View
-                    style={[
-                      styles.legendDot,
-                      { backgroundColor: cat.color || PALETA_COLORES[index % PALETA_COLORES.length] },
-                    ]}
-                  />
-                  <Text style={styles.legendText}>
-                    {cat.icono} {cat.nombre} ({cat.porcentaje}%)
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </>
+          </View>
         )}
       </View>
 
-      {/* 2. Gráfica de Barras por Categoría */}
+      {/* 2. Gráfica de Barras Horizontales por Categoría */}
       {categoriasDesglose.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>🏆 Gastos por Categoría</Text>
-          <Text style={styles.cardSubtitle}>Montos acumulados y porcentaje del total</Text>
+          <Text style={styles.cardTitle}>Ranking de Egresos por Categoría</Text>
+          <Text style={styles.cardSubtitle}>
+            Montos consolidados y porcentaje relativo sobre el total
+          </Text>
 
           {categoriasDesglose.map((cat, index) => {
             const colorBarra = cat.color || PALETA_COLORES[index % PALETA_COLORES.length];
             return (
               <View key={cat.nombre} style={styles.categoriaBarraRow}>
                 <View style={styles.categoriaBarraHeader}>
-                  <Text style={styles.categoriaBarraNombre}>
-                    {cat.icono} {cat.nombre}
-                  </Text>
+                  <Text style={styles.categoriaBarraNombre}>{cat.nombre}</Text>
                   <Text style={styles.categoriaBarraMonto}>
                     ${cat.total.toLocaleString("es-CO")}{" "}
                     <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
@@ -127,17 +191,17 @@ export function GraficasFinancieras({
         </View>
       )}
 
-      {/* 3. Gráfica Comparativa 50/30/20 (Presupuesto vs Real) */}
+      {/* 3. Gráfica Comparativa Regla 50/30/20 (Presupuesto vs Real) */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>⚖️ Comparativa 50/30/20 (Meta vs Real)</Text>
+        <Text style={styles.cardTitle}>Comparativa Regla 50 / 30 / 20</Text>
         <Text style={styles.cardSubtitle}>
-          ¿Cómo se comparan tus gastos frente a los límites recomendados?
+          Evaluación de ejecución presupuestal frente a límites recomendados
         </Text>
 
         {/* 50% Necesidades */}
         <View style={styles.comparativaItem}>
           <View style={styles.comparativaHeader}>
-            <Text style={styles.comparativaLabel}>50% Necesidades</Text>
+            <Text style={styles.comparativaLabel}>50% Necesidades Básicas</Text>
             <Text
               style={[
                 styles.comparativaEstado,
@@ -163,7 +227,7 @@ export function GraficasFinancieras({
         {/* 30% Deseos */}
         <View style={styles.comparativaItem}>
           <View style={styles.comparativaHeader}>
-            <Text style={styles.comparativaLabel}>30% Deseos / Ocio</Text>
+            <Text style={styles.comparativaLabel}>30% Deseos y Consumo Discrecional</Text>
             <Text
               style={[
                 styles.comparativaEstado,
@@ -236,49 +300,61 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 16,
     fontWeight: "700",
-    marginBottom: 2,
+    marginBottom: 3,
   },
   cardSubtitle: {
     color: colors.textSecondary,
     fontSize: 12,
     marginBottom: 14,
+    lineHeight: 16,
+  },
+  emptyContainer: {
+    paddingVertical: 16,
+    alignItems: "center",
   },
   emptyText: {
     color: colors.textSecondary,
     fontSize: 13,
-    paddingVertical: 10,
   },
-  stackedBar: {
-    height: 14,
-    borderRadius: 7,
-    flexDirection: "row",
-    overflow: "hidden",
-    backgroundColor: colors.cardBorder,
-    marginBottom: 12,
-  },
-  legendContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  legendItem: {
+  donutRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    justifyContent: "space-between",
+    gap: 12,
   },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+  svgWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
   },
-  legendText: {
+  donutLegend: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 8,
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  legendBox: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  legendNombre: {
     color: colors.textPrimary,
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
+  },
+  legendValor: {
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  legendPorcentaje: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
+    marginLeft: 6,
   },
   categoriaBarraRow: {
     marginBottom: 12,

@@ -17,8 +17,8 @@ UMBRAL_GASTO_HORMIGA_MAX = 25000.0  # Montos menores a $25.000 COP
 
 def _es_gasto_hormiga(valor: float, descripcion: Optional[str], cat_nombre: str, cat_prioridad: str) -> bool:
     """
-    Identifica de forma algorítmica si un gasto califica como 'gasto hormiga'
-    (micro-gasto no esencial recurrente).
+    Identifica de forma algorítmica si un gasto califica como gasto hormiga
+    (micro-gasto no esencial recurrente susceptible de optimización).
     """
     desc_limpia = (descripcion or "").lower()
     
@@ -27,7 +27,7 @@ def _es_gasto_hormiga(valor: float, descripcion: Optional[str], cat_nombre: str,
         if palabra in desc_limpia:
             return True
             
-    # 2. Por monto pequeño en categorías no esenciales (Ocio u Otros)
+    # 2. Por monto menor en categorías no esenciales (Ocio u Otros)
     if valor <= UMBRAL_GASTO_HORMIGA_MAX and cat_prioridad in {"baja", "media"}:
         return True
         
@@ -36,8 +36,8 @@ def _es_gasto_hormiga(valor: float, descripcion: Optional[str], cat_nombre: str,
 def evaluar_gasto(client, jwt: str, gasto: dict) -> Dict[str, Any]:
     """
     Evalúa el gasto recién registrado aplicando:
-    1. Detección algorítmica de 'gasto hormiga'.
-    2. Evaluación de gastos innecesarios (regla 50/30/20 en deseos).
+    1. Detección algorítmica de microgastos (gastos hormiga).
+    2. Evaluación de gastos prescindibles (regla 50/30/20 en rubro de deseos).
     3. Proyección predictiva mensual de ritmo de gasto.
     4. Diagnóstico de riesgo para metas de ahorro activas.
     """
@@ -104,72 +104,73 @@ def evaluar_gasto(client, jwt: str, gasto: dict) -> Dict[str, Any]:
         gasto_diario_promedio = total_gastos / dia_del_mes
         proyeccion_fin_mes = gasto_diario_promedio * 30
 
-        # Construcción de alertas y sugerencias predictivas:
         mensajes_alerta = []
         mensajes_sugerencia = []
 
-        # Caso A: Alerta de Gasto Hormiga
+        # Caso A: Detección de Gasto Hormiga
         if es_hormiga:
             mensajes_alerta.append(
-                f"🐜 Aviso de Gasto Hormiga: Este desembolso (${valor_gasto:,.0f}) parece pequeño, "
-                f"pero ya acumulas ${total_hormiga:,.0f} en {cantidad_hormiga} micro-gastos este mes."
+                f"Aviso de Microgasto (Gasto Hormiga): Este desembolso (${valor_gasto:,.0f}) representa una salida menor recurrente. "
+                f"En el período actual acumulas ${total_hormiga:,.0f} distribuidos en {cantidad_hormiga} micro-gastos."
             )
             if primera_meta:
-                dias_acelerados = math.ceil(total_hormiga / (float(primera_meta.get("cuota_sugerida", 1)) / 30)) if float(primera_meta.get("cuota_sugerida", 0)) > 0 else 15
-                mensajes_sugerencia.append(
-                    f"💡 Si optimizas estos micro-gastos, podrías abonar más a tu meta '{primera_meta.get('nombre')}' "
-                    f"y alcanzarla aproximadamente {min(60, max(5, dias_acelerados))} días antes."
-                )
+                cuota_meta = float(primera_meta.get("cuota_sugerida", 0))
+                if cuota_meta > 0:
+                    dias_acelerados = math.ceil((total_hormiga / cuota_meta) * 30)
+                    mensajes_sugerencia.append(
+                        f"Análisis de Optimización: Redirigir este capital al ahorro permitiría abonar a la meta '{primera_meta.get('nombre')}', "
+                        f"acelerando su cumplimiento en aproximadamente {min(60, max(5, dias_acelerados))} días."
+                    )
 
-        # Caso B: Alerta de Gasto Innecesario / Deseos excedidos
+        # Caso B: Gasto Prescindible / Deseos excedidos
         if gasto_innecesario:
             mensajes_alerta.append(
-                f"⚠️ Gasto Prescindible / Deseo Excedido: Has sobrepasado el 30% recomendado para compras secundarias "
-                f"(${gastos_deseos:,.0f} de ${limite_deseos_30:,.0f} permitidos)."
+                f"Alerta Presupuestal: Has alcanzado el límite del 30% destinado a gastos discrecionales y ocio "
+                f"(${gastos_deseos:,.0f} ejecutados frente a ${limite_deseos_30:,.0f} proyectados)."
             )
             mensajes_sugerencia.append(
-                "Prioriza cubrir primero tus necesidades básicas y compromisos de ahorro antes de realizar más compras no esenciales."
+                "Recomendación: Se aconseja posponer compras secundarias para salvaguardar la liquidez y las metas del período."
             )
 
         # Caso C: Metas en riesgo
         if metas_activas and saldo_disponible < suma_cuotas_metas:
             mensajes_alerta.append(
-                f"🚨 Metas en Riesgo: Tu saldo disponible restante (${saldo_disponible:,.0f}) "
-                f"es menor a la cuota requerida (${suma_cuotas_metas:,.0f}) para tus metas del mes."
+                f"Compromiso de Metas: El saldo disponible restante (${saldo_disponible:,.0f}) "
+                f"es inferior a la cuota requerida (${suma_cuotas_metas:,.0f}) para las metas programadas."
             )
             if primera_meta and not es_hormiga:
                 mensajes_sugerencia.append(
-                    f"Para proteger tu meta '{primera_meta.get('nombre')}', sugerimos pausar gastos en ocio y compras secundarias."
+                    f"Priorización: Para proteger el cumplimiento de '{primera_meta.get('nombre')}', es necesario limitar egresos no esenciales."
                 )
 
         # Caso D: Proyección mensual que excede ingresos
         elif total_ingresos > 0 and proyeccion_fin_mes > total_ingresos:
             exceso = proyeccion_fin_mes - total_ingresos
             mensajes_alerta.append(
-                f"📈 Proyección Predictiva: Al ritmo actual (${gasto_diario_promedio:,.0f}/día), "
-                f"proyectas gastar ${proyeccion_fin_mes:,.0f} a fin de mes, excediendo tus ingresos por ${exceso:,.0f}."
+                f"Proyección Predictiva: Al ritmo actual de consumo (${gasto_diario_promedio:,.0f}/día), "
+                f"el gasto acumulado a fin de mes alcanzará ${proyeccion_fin_mes:,.0f}, superando los ingresos por ${exceso:,.0f}."
             )
             mensajes_sugerencia.append(
-                "Reduce tu gasto diario promedio en un 15% para equilibrar tu balance antes de fin de mes."
+                "Ajuste Sugerido: Se requiere una reducción del 15% en gastos no esenciales para evitar un déficit presupuestal."
             )
 
         # Caso E: En buen camino
         elif total_ingresos > 0:
             porcentaje_gastado = (total_gastos / total_ingresos) * 100
             mensajes_sugerencia.append(
-                f"✅ Vas por buen camino: Has consumido el {porcentaje_gastado:.1f}% de tus ingresos totales. "
-                "Mantén tus gastos esenciales por debajo del 50% y reserva el 20% para tu ahorro."
+                f"Estado Presupuestal Favorable: Has ejecutado el {porcentaje_gastado:.1f}% de tus ingresos totales. "
+                "La distribución se mantiene dentro de los márgenes recomendados de la regla 50/30/20."
             )
         else:
             mensajes_sugerencia.append(
-                "Registra tus ingresos mensuales para activar todas las predicciones y recomendaciones de la regla 50/30/20."
+                "Registra tus ingresos mensuales para habilitar los diagnósticos predictivos y límites de la regla 50/30/20."
             )
 
         alerta = "\n\n".join(mensajes_alerta) if mensajes_alerta else None
         sugerencia = "\n\n".join(mensajes_sugerencia) if mensajes_sugerencia else None
 
     except Exception:
-        sugerencia = "Gasto registrado. Recuerda mantener un control balanceado de tus gastos."
+        sugerencia = "Gasto registrado correctamente. Se recomienda mantener una supervisión periódica de las salidas de capital."
 
     return {
         "sugerencia": sugerencia,
@@ -180,7 +181,8 @@ def evaluar_gasto(client, jwt: str, gasto: dict) -> Dict[str, Any]:
 
 def obtener_analisis_algoritmico(client, jwt: str) -> Dict[str, Any]:
     """
-    Genera un informe analítico y predictivo integral para la pantalla de Reportes / Home.
+    Genera un informe analítico y predictivo integral para la pantalla de Reportes / Home
+    con redacción formal y estructurada.
     """
     todos_gastos = gastos_repo.listar_gastos(client, jwt) or []
     todos_ingresos = ingresos_repo.listar_ingreso(client, jwt) or []
@@ -224,7 +226,7 @@ def obtener_analisis_algoritmico(client, jwt: str) -> Dict[str, Any]:
     promedio_diario = total_gastos / dia
     proyeccion_mes = promedio_diario * 30
 
-    # 4. Gastos frecuentes (top categorías y conceptos)
+    # 4. Gastos frecuentes
     conteo_categorias: Dict[str, Dict[str, Any]] = {}
     for g in todos_gastos:
         c_id = str(g.get("categoria_id"))
@@ -236,7 +238,7 @@ def obtener_analisis_algoritmico(client, jwt: str) -> Dict[str, Any]:
 
     top_categorias = sorted(conteo_categorias.values(), key=lambda x: x["total"], reverse=True)
 
-    # Impacto en la meta más próxima
+    # Impacto en metas
     metas_activas = [m for m in metas if m.get("estado") == "por_cumplir"]
     primera_meta = metas_activas[0] if metas_activas else None
     impacto_hormiga_meta = ""
@@ -244,7 +246,10 @@ def obtener_analisis_algoritmico(client, jwt: str) -> Dict[str, Any]:
         cuota = float(primera_meta.get("cuota_sugerida", 0))
         if cuota > 0:
             meses_adelanto = round(total_hormiga / cuota, 1)
-            impacto_hormiga_meta = f"Ahorrando tus gastos hormiga (${total_hormiga:,.0f}), podrías adelantar {meses_adelanto} cuota(s) de tu meta '{primera_meta.get('nombre')}'."
+            impacto_hormiga_meta = (
+                f"El ahorro acumulado en microgastos (${total_hormiga:,.0f}) equivale a {meses_adelanto} cuota(s) "
+                f"de la meta '{primera_meta.get('nombre')}'."
+            )
 
     return {
         "resumen": {

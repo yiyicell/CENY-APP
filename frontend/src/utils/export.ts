@@ -1,6 +1,8 @@
 import { Platform, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import * as Print from "expo-print";
+import * as XLSX from "xlsx";
 import { formatearFechaCO, obtenerHoyCO } from "@/utils/date";
 
 export interface DatosExportacion {
@@ -36,226 +38,453 @@ export interface DatosExportacion {
 }
 
 /**
- * Genera el contenido de una planilla CSV compatible con Microsoft Excel (UTF-8 con BOM y separador punto y coma).
+ * Genera un libro de Microsoft Excel (.xlsx) con múltiples hojas estructuradas.
  */
-export function generarCSV(datos: DatosExportacion): string {
+export async function exportarExcelXLSX(datos: DatosExportacion): Promise<void> {
   const hoy = obtenerHoyCO();
-  const lineas: string[] = [];
+  const nombreArchivo = `CENY_Informe_Financiero_${hoy.replace(/\//g, "-")}.xlsx`;
 
-  // BOM para que Excel reconozca tildes en Windows/Mac
-  lineas.push("\uFEFF");
+  const wb = XLSX.utils.book_new();
 
-  // Encabezado principal
-  lineas.push("REPORTE FINANCIERO - CENY APP");
-  lineas.push(`Usuario:;${datos.usuarioNombre || "Usuario"}`);
-  lineas.push(`Fecha de Emisión:;${hoy}`);
-  lineas.push("");
+  // Hoja 1: Resumen General
+  const filasResumen = [
+    ["INFORME FINANCIERO EJECUTIVO - CENY APP"],
+    ["Usuario:", datos.usuarioNombre || "Usuario"],
+    ["Fecha de Emision:", hoy],
+    [],
+    ["INDICADOR FINANCIERO", "VALOR (COP)"],
+    ["Ingresos Totales", datos.totalIngresos],
+    ["Gastos Totales", datos.totalGastos],
+    ["Saldo Disponible Neto", datos.saldoDisponible],
+    ["Microgastos Hormiga Acumulados", datos.gastosHormigaTotal || 0],
+    ["Gasto Mensual Proyectado", datos.proyeccionFinMes || 0],
+    [],
+    ["DISTRIBUCION REGLA 50/30/20", "GASTO REAL (COP)", "LIMITE PREVISTO (COP)", "ESTADO"],
+    [
+      "50% Necesidades Basicas",
+      datos.gastosAlta,
+      datos.target50,
+      datos.gastosAlta > datos.target50 ? "Excedido" : "En margen",
+    ],
+    [
+      "30% Deseos y Consumo Discrecional",
+      datos.gastosMediaBaja,
+      datos.target30,
+      datos.gastosMediaBaja > datos.target30 ? "Excedido" : "En margen",
+    ],
+    [
+      "20% Ahorro e Inversion",
+      Math.max(0, datos.saldoDisponible),
+      datos.target20,
+      datos.saldoDisponible >= datos.target20 ? "Cumplido" : "Por alcanzar",
+    ],
+  ];
+  const wsResumen = XLSX.utils.aoa_to_sheet(filasResumen);
+  XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen General");
 
-  // Resumen General
-  lineas.push("RESUMEN FINANCIERO GENERAL;Monto (COP)");
-  lineas.push(`Total Ingresos:;$ ${datos.totalIngresos.toLocaleString("es-CO")}`);
-  lineas.push(`Total Gastos:;$ ${datos.totalGastos.toLocaleString("es-CO")}`);
-  lineas.push(`Saldo Disponible:;$ ${datos.saldoDisponible.toLocaleString("es-CO")}`);
-  if (datos.gastosHormigaTotal !== undefined) {
-    lineas.push(`Micro-gastos Hormiga:;$ ${datos.gastosHormigaTotal.toLocaleString("es-CO")}`);
-  }
-  if (datos.proyeccionFinMes !== undefined) {
-    lineas.push(`Gasto Mensual Proyectado:;$ ${datos.proyeccionFinMes.toLocaleString("es-CO")}`);
-  }
-  lineas.push("");
+  // Hoja 2: Detalle de Gastos
+  const filasGastos = [
+    ["Fecha (DD/MM/AAAA)", "Categoria", "Descripcion", "Valor (COP)"],
+    ...datos.gastos.map((g) => [
+      formatearFechaCO(g.fecha),
+      g.categoria,
+      g.descripcion || "",
+      g.valor,
+    ]),
+  ];
+  const wsGastos = XLSX.utils.aoa_to_sheet(filasGastos);
+  XLSX.utils.book_append_sheet(wb, wsGastos, "Detalle Gastos");
 
-  // Regla 50/30/20
-  lineas.push("DISTRIBUCIÓN REGLA 50/30/20;Gastado (COP);Límite / Meta (COP);Estado");
-  lineas.push(
-    `50% Necesidades Básicas;${datos.gastosAlta};${datos.target50};${
-      datos.gastosAlta > datos.target50 ? "Excedido" : "En presupuesto"
-    }`
-  );
-  lineas.push(
-    `30% Deseos y Estilo de Vida;${datos.gastosMediaBaja};${datos.target30};${
-      datos.gastosMediaBaja > datos.target30 ? "Excedido" : "En presupuesto"
-    }`
-  );
-  lineas.push(
-    `20% Ahorro e Inversión;${Math.max(0, datos.saldoDisponible)};${datos.target20};${
-      datos.saldoDisponible >= datos.target20 ? "Cumplido" : "Por alcanzar"
-    }`
-  );
-  lineas.push("");
+  // Hoja 3: Detalle de Ingresos
+  const filasIngresos = [
+    ["Fecha (DD/MM/AAAA)", "Concepto", "Valor (COP)"],
+    ...datos.ingresos.map((i) => [
+      formatearFechaCO(i.fecha),
+      i.descripcion || "Ingreso registrado",
+      i.valor,
+    ]),
+  ];
+  const wsIngresos = XLSX.utils.aoa_to_sheet(filasIngresos);
+  XLSX.utils.book_append_sheet(wb, wsIngresos, "Detalle Ingresos");
 
-  // Metas de Ahorro
-  lineas.push("METAS DE AHORRO;Aportado (COP);Objetivo (COP);Progreso;Fecha Límite;Estado");
-  datos.metas.forEach((m) => {
-    const progreso = m.valor_objetivo > 0 ? Math.round((m.aportado / m.valor_objetivo) * 100) : 0;
-    lineas.push(
-      `"${m.nombre}";${m.aportado};${m.valor_objetivo};${progreso}%;${formatearFechaCO(
-        m.fecha_objetivo
-      )};${m.estado || "En progreso"}`
-    );
-  });
-  lineas.push("");
-
-  // Detalle de Gastos
-  lineas.push("DETALLE DE GASTOS;Fecha (DD/MM/AAAA);Categoría;Descripción;Valor (COP)");
-  datos.gastos.forEach((g) => {
-    lineas.push(
-      `;${formatearFechaCO(g.fecha)};"${g.categoria}";"${(g.descripcion || "").replace(
-        /"/g,
-        '""'
-      )}";${g.valor}`
-    );
-  });
-  lineas.push("");
-
-  // Detalle de Ingresos
-  lineas.push("DETALLE DE INGRESOS;Fecha (DD/MM/AAAA);Concepto;Valor (COP)");
-  datos.ingresos.forEach((i) => {
-    lineas.push(
-      `;${formatearFechaCO(i.fecha)};"${(i.descripcion || "Ingreso").replace(
-        /"/g,
-        '""'
-      )}";${i.valor}`
-    );
-  });
-
-  return lineas.join("\n");
-}
-
-/**
- * Genera un resumen ejecutivo en texto claro para compartir por WhatsApp, Correo o Mensajería.
- */
-export function generarTextoReporte(datos: DatosExportacion): string {
-  const hoy = obtenerHoyCO();
-  return `📊 REPORTE FINANCIERO CENY (${hoy})
-Usuario: ${datos.usuarioNombre || "Usuario"}
-
-💰 BALANCE:
-• Ingresos: $${datos.totalIngresos.toLocaleString("es-CO")}
-• Gastos: $${datos.totalGastos.toLocaleString("es-CO")}
-• Saldo Disponible: $${datos.saldoDisponible.toLocaleString("es-CO")}
-
-📐 REGLA 50/30/20:
-• Necesidades (50%): $${datos.gastosAlta.toLocaleString("es-CO")} / $${datos.target50.toLocaleString("es-CO")} (${datos.gastosAlta > datos.target50 ? "⚠️ Excedido" : "✅ Al día"})
-• Deseos (30%): $${datos.gastosMediaBaja.toLocaleString("es-CO")} / $${datos.target30.toLocaleString("es-CO")} (${datos.gastosMediaBaja > datos.target30 ? "⚠️ Excedido" : "✅ Al día"})
-• Ahorro (20%): $${Math.max(0, datos.saldoDisponible).toLocaleString("es-CO")} / $${datos.target20.toLocaleString("es-CO")}
-
-🎯 METAS ACTIVAS:
-${
-  datos.metas.length === 0
-    ? "Sin metas activas."
-    : datos.metas
-        .map(
-          (m) =>
-            `• ${m.nombre}: $${m.aportado.toLocaleString("es-CO")} de $${m.valor_objetivo.toLocaleString("es-CO")} (${formatearFechaCO(m.fecha_objetivo)})`
-        )
-        .join("\n")
-}
-
-🐜 GASTOS HORMIGA:
-${
-  datos.gastosHormigaTotal
-    ? `Total acumulado en micro-gastos: $${datos.gastosHormigaTotal.toLocaleString("es-CO")}`
-    : "Sin gastos hormiga detectados."
-}
-
-Generado automáticamente por Ceny App - Control Financiero Inteligente.`;
-}
-
-/**
- * Exporta el archivo CSV abriendo la ventana de compartir o descargando el archivo según la plataforma.
- */
-export async function exportarArchivoCSV(datos: DatosExportacion): Promise<void> {
-  const contenido = generarCSV(datos);
-  const nombreArchivo = `CENY_Reporte_${obtenerHoyCO().replace(/\//g, "-")}.csv`;
+  // Hoja 4: Metas de Ahorro
+  const filasMetas = [
+    [
+      "Nombre de la Meta",
+      "Valor Objetivo (COP)",
+      "Total Aportado (COP)",
+      "Porcentaje Cumplimiento",
+      "Fecha Limite (DD/MM/AAAA)",
+      "Estado",
+    ],
+    ...datos.metas.map((m) => [
+      m.nombre,
+      m.valor_objetivo,
+      m.aportado,
+      `${m.valor_objetivo > 0 ? Math.round((m.aportado / m.valor_objetivo) * 100) : 0}%`,
+      formatearFechaCO(m.fecha_objetivo),
+      m.estado || "En progreso",
+    ]),
+  ];
+  const wsMetas = XLSX.utils.aoa_to_sheet(filasMetas);
+  XLSX.utils.book_append_sheet(wb, wsMetas, "Metas de Ahorro");
 
   if (Platform.OS === "web") {
-    // Descarga directa en navegador Web
-    const blob = new Blob([contenido], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", nombreArchivo);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Descarga directa en navegador Web como archivo .xlsx genuino
+    XLSX.writeFile(wb, nombreArchivo);
     return;
   }
 
-  // En dispositivo móvil (iOS / Android con Expo)
+  // En dispositivo móvil (iOS / Android)
   try {
+    const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
     const fileUri = `${FileSystem.cacheDirectory}${nombreArchivo}`;
-    await FileSystem.writeAsStringAsync(fileUri, contenido, {
-      encoding: FileSystem.EncodingType.UTF8,
+    await FileSystem.writeAsStringAsync(fileUri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
     });
 
     const isAvailable = await Sharing.isAvailableAsync();
     if (isAvailable) {
       await Sharing.shareAsync(fileUri, {
-        mimeType: "text/csv",
-        dialogTitle: "Exportar Reporte a Excel (CSV)",
-        UTI: "public.comma-separated-values-text",
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        dialogTitle: "Abrir o compartir hoja de calculo Excel",
+        UTI: "com.microsoft.excel.xlsx",
       });
       return;
     }
   } catch (err) {
-    // Fallback con Share nativo de React Native
+    // Fallback genérico si Sharing no responde
   }
 
   await Share.share({
-    title: "Reporte Financiero CENY",
-    message: generarTextoReporte(datos),
+    title: "Informe Financiero CENY",
+    message: generarTextoReporteFormal(datos),
   });
 }
 
 /**
- * Exporta o comparte el resumen ejecutivo formateado.
+ * Genera el documento HTML profesional para convertir a archivo PDF imprimible.
  */
-export async function compartirResumen(datos: DatosExportacion): Promise<void> {
-  const mensaje = generarTextoReporte(datos);
-  if (Platform.OS === "web") {
-    // En web, si el navegador soporta navigator.share, usarlo; de lo contrario copiar al portapapeles o imprimir
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title: "Reporte Financiero CENY",
-          text: mensaje,
-        });
-        return;
-      } catch {
-        // usuario canceló o error
+export function generarHTMLReporte(datos: DatosExportacion): string {
+  const hoy = obtenerHoyCO();
+
+  const filasGastosHTML = datos.gastos
+    .slice(0, 30)
+    .map(
+      (g) => `
+      <tr>
+        <td>${formatearFechaCO(g.fecha)}</td>
+        <td>${g.categoria}</td>
+        <td>${g.descripcion || "-"}</td>
+        <td style="text-align: right;">$ ${g.valor.toLocaleString("es-CO")}</td>
+      </tr>`
+    )
+    .join("");
+
+  const filasMetasHTML = datos.metas
+    .map((m) => {
+      const pct = m.valor_objetivo > 0 ? Math.round((m.aportado / m.valor_objetivo) * 100) : 0;
+      return `
+      <tr>
+        <td><strong>${m.nombre}</strong></td>
+        <td style="text-align: right;">$ ${m.aportado.toLocaleString("es-CO")}</td>
+        <td style="text-align: right;">$ ${m.valor_objetivo.toLocaleString("es-CO")}</td>
+        <td style="text-align: center;">${pct}%</td>
+        <td>${formatearFechaCO(m.fecha_objetivo)}</td>
+        <td>${m.estado === "cumplido" ? "Cumplida" : "En progreso"}</td>
+      </tr>`;
+    })
+    .join("");
+
+  return `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Informe Financiero - CENY APP</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          color: #1e293b;
+          margin: 0;
+          padding: 24px;
+          background: #ffffff;
+        }
+        .header {
+          border-bottom: 2px solid #0f172a;
+          padding-bottom: 12px;
+          margin-bottom: 20px;
+        }
+        .header h1 {
+          font-size: 20px;
+          color: #0f172a;
+          margin: 0 0 6px 0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .header .meta {
+          font-size: 12px;
+          color: #64748b;
+        }
+        .kpi-grid {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+        .kpi-card {
+          flex: 1;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 12px;
+          background: #f8fafc;
+        }
+        .kpi-title {
+          font-size: 11px;
+          color: #64748b;
+          text-transform: uppercase;
+          margin-bottom: 4px;
+        }
+        .kpi-value {
+          font-size: 17px;
+          font-weight: bold;
+          color: #0f172a;
+        }
+        .section-title {
+          font-size: 14px;
+          color: #0f172a;
+          font-weight: bold;
+          margin: 18px 0 8px 0;
+          text-transform: uppercase;
+          border-left: 3px solid #0284c7;
+          padding-left: 8px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 16px;
+          font-size: 12px;
+        }
+        th, td {
+          border: 1px solid #cbd5e1;
+          padding: 7px 10px;
+          text-align: left;
+        }
+        th {
+          background-color: #f1f5f9;
+          color: #334155;
+          font-weight: 600;
+        }
+        .notice-box {
+          background: #f8fafc;
+          border: 1px solid #cbd5e1;
+          border-left: 4px solid #f59e0b;
+          padding: 10px 14px;
+          font-size: 12px;
+          color: #334155;
+          margin-bottom: 16px;
+          border-radius: 4px;
+        }
+        .footer {
+          margin-top: 24px;
+          padding-top: 10px;
+          border-top: 1px solid #e2e8f0;
+          font-size: 10px;
+          color: #94a3b8;
+          text-align: right;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Informe de Control Financiero y Presupuesto</h1>
+        <div class="meta">
+          <strong>Usuario:</strong> ${datos.usuarioNombre || "Usuario"} &nbsp;|&nbsp; 
+          <strong>Fecha de emision:</strong> ${hoy} &nbsp;|&nbsp; 
+          <strong>Moneda:</strong> COP (Pesos Colombianos)
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-title">Ingresos Totales</div>
+          <div class="kpi-value">$ ${datos.totalIngresos.toLocaleString("es-CO")}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Gastos Totales</div>
+          <div class="kpi-value">$ ${datos.totalGastos.toLocaleString("es-CO")}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Saldo Disponible Neto</div>
+          <div class="kpi-value">$ ${datos.saldoDisponible.toLocaleString("es-CO")}</div>
+        </div>
+      </div>
+
+      <div class="section-title">Distribucion Presupuestal (Regla 50 / 30 / 20)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Rubro</th>
+            <th>Gasto Real (COP)</th>
+            <th>Limite Recomendado (COP)</th>
+            <th>Porcentaje Ejecutado</th>
+            <th>Diagnostico</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Necesidades Basicas (50%)</td>
+            <td>$ ${datos.gastosAlta.toLocaleString("es-CO")}</td>
+            <td>$ ${datos.target50.toLocaleString("es-CO")}</td>
+            <td>${datos.target50 > 0 ? Math.round((datos.gastosAlta / datos.target50) * 100) : 0}%</td>
+            <td>${datos.gastosAlta > datos.target50 ? "Excede el limite recomendado" : "Dentro de margen planificado"}</td>
+          </tr>
+          <tr>
+            <td>Deseos y Ocio (30%)</td>
+            <td>$ ${datos.gastosMediaBaja.toLocaleString("es-CO")}</td>
+            <td>$ ${datos.target30.toLocaleString("es-CO")}</td>
+            <td>${datos.target30 > 0 ? Math.round((datos.gastosMediaBaja / datos.target30) * 100) : 0}%</td>
+            <td>${datos.gastosMediaBaja > datos.target30 ? "Excede el limite recomendado" : "Dentro de margen planificado"}</td>
+          </tr>
+          <tr>
+            <td>Ahorro e Inversion (20%)</td>
+            <td>$ ${Math.max(0, datos.saldoDisponible).toLocaleString("es-CO")}</td>
+            <td>$ ${datos.target20.toLocaleString("es-CO")}</td>
+            <td>${datos.target20 > 0 ? Math.round((Math.max(0, datos.saldoDisponible) / datos.target20) * 100) : 0}%</td>
+            <td>${datos.saldoDisponible >= datos.target20 ? "Objetivo alcanzado" : "En proceso de acumulacion"}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      ${
+        datos.gastosHormigaTotal
+          ? `
+      <div class="notice-box">
+        <strong>Auditoria de Microgastos (Gastos Hormiga):</strong><br>
+        Se han registrado salidas acumuladas por <strong>$ ${datos.gastosHormigaTotal.toLocaleString(
+          "es-CO"
+        )}</strong> en compras de bajo monto. La reduccion programada de estos desembolsos optimiza la capacidad de capital para tus metas de ahorro prioritarias.
+      </div>`
+          : ""
       }
-    }
-    // Abrir ventana para imprimir en PDF
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Reporte Financiero - CENY APP</title>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 30px; color: #1e293b; }
-              h1 { color: #0f172a; border-bottom: 2px solid #22c55e; padding-bottom: 10px; }
-              pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; line-height: 1.6; }
-              button { background: #22c55e; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
-              @media print { button { display: none; } }
-            </style>
-          </head>
-          <body>
-            <h1>Reporte Financiero - CENY APP</h1>
-            <p><button onclick="window.print()">🖨️ Imprimir / Guardar en PDF</button></p>
-            <pre>${mensaje}</pre>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
+
+      <div class="section-title">Seguimiento de Metas de Ahorro</div>
+      ${
+        datos.metas.length === 0
+          ? "<p style='font-size: 12px; color: #64748b;'>No existen metas de ahorro registradas en el periodo.</p>"
+          : `
+      <table>
+        <thead>
+          <tr>
+            <th>Meta</th>
+            <th>Aportado (COP)</th>
+            <th>Objetivo (COP)</th>
+            <th>Progreso</th>
+            <th>Fecha Limite</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filasMetasHTML}
+        </tbody>
+      </table>`
+      }
+
+      <div class="section-title">Registro Reciente de Gastos</div>
+      ${
+        datos.gastos.length === 0
+          ? "<p style='font-size: 12px; color: #64748b;'>No se registran gastos en el periodo.</p>"
+          : `
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Categoria</th>
+            <th>Descripcion</th>
+            <th>Monto (COP)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filasGastosHTML}
+        </tbody>
+      </table>`
+      }
+
+      <div class="footer">
+        Documento generado por Ceny App - Sistema de Informacion y Planificacion Financiera Personal
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Exporta el archivo PDF formal utilizando expo-print y expo-sharing.
+ */
+export async function exportarPDF(datos: DatosExportacion): Promise<void> {
+  const html = generarHTMLReporte(datos);
+
+  if (Platform.OS === "web") {
+    await Print.printAsync({ html });
     return;
   }
 
-  // En móvil
-  await Share.share({
-    title: "Reporte Financiero CENY",
-    message: mensaje,
-  });
+  // En dispositivo móvil (iOS / Android)
+  try {
+    const { uri } = await Print.printToFileAsync({ html });
+    await Sharing.shareAsync(uri, {
+      mimeType: "application/pdf",
+      dialogTitle: "Guardar o compartir informe PDF",
+      UTI: "com.adobe.pdf",
+    });
+  } catch (err: any) {
+    await Share.share({
+      title: "Informe Financiero CENY",
+      message: generarTextoReporteFormal(datos),
+    });
+  }
+}
+
+/**
+ * Genera el resumen formal sin emojis.
+ */
+export function generarTextoReporteFormal(datos: DatosExportacion): string {
+  const hoy = obtenerHoyCO();
+  return `INFORME FINANCIERO EJECUTIVO - CENY APP
+Fecha de emision: ${hoy}
+Usuario: ${datos.usuarioNombre || "Usuario"}
+
+1. RESUMEN DE BALANCE GENERAL:
+- Ingresos Totales: $ ${datos.totalIngresos.toLocaleString("es-CO")}
+- Gastos Totales: $ ${datos.totalGastos.toLocaleString("es-CO")}
+- Saldo Disponible Neto: $ ${datos.saldoDisponible.toLocaleString("es-CO")}
+
+2. DISTRIBUCION REGLA 50/30/20:
+- Necesidades Basicas (50%): $ ${datos.gastosAlta.toLocaleString("es-CO")} de $ ${datos.target50.toLocaleString("es-CO")} (${
+    datos.gastosAlta > datos.target50 ? "Excedido" : "En margen"
+  })
+- Deseos y Ocio (30%): $ ${datos.gastosMediaBaja.toLocaleString("es-CO")} de $ ${datos.target30.toLocaleString("es-CO")} (${
+    datos.gastosMediaBaja > datos.target30 ? "Excedido" : "En margen"
+  })
+- Ahorro e Inversion (20%): $ ${Math.max(0, datos.saldoDisponible).toLocaleString("es-CO")} de $ ${datos.target20.toLocaleString("es-CO")}
+
+3. METAS DE AHORRO:
+${
+  datos.metas.length === 0
+    ? "No se registran metas de ahorro."
+    : datos.metas
+        .map(
+          (m) =>
+            `- ${m.nombre}: $ ${m.aportado.toLocaleString("es-CO")} de $ ${m.valor_objetivo.toLocaleString("es-CO")} (Limite: ${formatearFechaCO(m.fecha_objetivo)})`
+        )
+        .join("\n")
+}
+
+4. AUDITORIA DE MICROGASTOS (GASTOS HORMIGA):
+${
+  datos.gastosHormigaTotal
+    ? `Total acumulado en microgastos: $ ${datos.gastosHormigaTotal.toLocaleString("es-CO")}`
+    : "Sin microgastos detectados en el periodo."
+}
+
+Documento emitido por el sistema Ceny App.`;
 }

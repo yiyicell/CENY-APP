@@ -16,18 +16,9 @@ import { obtenerAnalisisAPI } from "@/services/api";
 import { GraficasFinancieras, CategoriaDesglose } from "@/components/GraficasFinancieras";
 import {
   DatosExportacion,
-  exportarArchivoCSV,
-  compartirResumen,
+  exportarExcelXLSX,
+  exportarPDF,
 } from "@/utils/export";
-
-const ICONOS_CATEGORIAS: Record<string, string> = {
-  Alimentación: "🍽️",
-  Transporte: "🚌",
-  Vivienda: "🏠",
-  Salud: "❤️",
-  Ocio: "🎮",
-  Otros: "📦",
-};
 
 const COLORES_CATEGORIAS: Record<string, string> = {
   Alimentación: "#10B981",
@@ -35,7 +26,7 @@ const COLORES_CATEGORIAS: Record<string, string> = {
   Vivienda: "#6366F1",
   Salud: "#EC4899",
   Ocio: "#F59E0B",
-  Otros: "#6B7280",
+  Otros: "#64748B",
 };
 
 export default function ReportesScreen() {
@@ -117,7 +108,6 @@ export default function ReportesScreen() {
         total: tot,
         porcentaje: pct,
         color: COLORES_CATEGORIAS[nom] || "#8B5CF6",
-        icono: ICONOS_CATEGORIAS[nom] || "💸",
         prioridad: acumPorCat[nom].prio,
       };
     });
@@ -150,7 +140,7 @@ export default function ReportesScreen() {
       analisisBackend = await obtenerAnalisisAPI();
       setAnalisisAPI(analisisBackend);
     } catch {
-      // Ignorar fallback
+      // Continuar con fallback
     }
 
     // Preparar objeto para exportación
@@ -189,28 +179,28 @@ export default function ReportesScreen() {
     cargarReporte();
   }
 
-  async function handleExportarCSV() {
+  async function handleExportarExcel() {
     if (!datosExportar) return;
     setExportando(true);
     try {
-      await exportarArchivoCSV(datosExportar);
+      await exportarExcelXLSX(datosExportar);
       if (Platform.OS === "web") {
-        Alert.alert("Exportación completada", "El archivo CSV ha sido descargado correctamente.");
+        Alert.alert("Descarga Completa", "El libro de calculo Excel (.xlsx) ha sido generado exitosamente.");
       }
     } catch (e: any) {
-      Alert.alert("Error al exportar", e.message || "No se pudo generar el archivo");
+      Alert.alert("Error en exportacion", e.message || "No fue posible generar el archivo Excel");
     } finally {
       setExportando(false);
     }
   }
 
-  async function handleCompartir() {
+  async function handleExportarPDF() {
     if (!datosExportar) return;
     setExportando(true);
     try {
-      await compartirResumen(datosExportar);
+      await exportarPDF(datosExportar);
     } catch (e: any) {
-      Alert.alert("Error al compartir", e.message || "No se pudo abrir el cuadro de compartir");
+      Alert.alert("Error en exportacion", e.message || "No fue posible generar el documento PDF");
     } finally {
       setExportando(false);
     }
@@ -235,65 +225,65 @@ export default function ReportesScreen() {
         />
       }
     >
-      <Text style={styles.title}>Reportes Financieros</Text>
+      <Text style={styles.title}>Informe Financiero y Analítica</Text>
       <Text style={styles.subtitulo}>
-        Análisis predictivo, regla 50/30/20 y gráficas interactivas
+        Evaluación presupuestal, auditoría de microgastos y gráficas de distribución
       </Text>
 
-      {/* Resumen Global */}
+      {/* Resumen Global de Balance */}
       <View style={styles.cardResumen}>
         <View style={styles.resumenItem}>
-          <Text style={styles.resumenLabel}>Ingresos</Text>
+          <Text style={styles.resumenLabel}>Ingresos Registrados</Text>
           <Text style={[styles.resumenValor, { color: colors.success }]}>
             ${totalIngresos.toLocaleString("es-CO")}
           </Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.resumenItem}>
-          <Text style={styles.resumenLabel}>Gastos</Text>
+          <Text style={styles.resumenLabel}>Gastos Consolidados</Text>
           <Text style={[styles.resumenValor, { color: colors.danger }]}>
             ${totalGastos.toLocaleString("es-CO")}
           </Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.resumenItem}>
-          <Text style={styles.resumenLabel}>Disponible</Text>
+          <Text style={styles.resumenLabel}>Saldo Neto</Text>
           <Text style={[styles.resumenValor, { color: colors.textPrimary }]}>
             ${saldoDisponible.toLocaleString("es-CO")}
           </Text>
         </View>
       </View>
 
-      {/* Botones de Exportación (PDF / XLS / CSV) */}
+      {/* Módulo de Exportación Formal (Excel y PDF) */}
       <View style={styles.exportarCard}>
-        <Text style={styles.exportarTitulo}>📥 Exportar Reporte</Text>
+        <Text style={styles.exportarTitulo}>Descarga de Informes Formales</Text>
         <Text style={styles.exportarDesc}>
-          Descarga o comparte un informe completo con balance, metas y desglose de gastos.
+          Exporta una hoja de cálculo estructurada en formato Microsoft Excel (.xlsx) o genera un documento PDF formal con el estado financiero consolidado.
         </Text>
         <View style={styles.exportarBtnRow}>
           <TouchableOpacity
-            onPress={handleExportarCSV}
+            onPress={handleExportarExcel}
             disabled={exportando}
             style={[styles.btnExportar, { backgroundColor: "#10B981" }]}
           >
             <Text style={styles.btnExportarTexto}>
-              {exportando ? "Generando..." : "📊 Exportar a Excel (CSV)"}
+              {exportando ? "Procesando..." : "Exportar a Excel (.xlsx)"}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={handleCompartir}
+            onPress={handleExportarPDF}
             disabled={exportando}
-            style={[styles.btnExportar, { backgroundColor: "#6366F1" }]}
+            style={[styles.btnExportar, { backgroundColor: "#2563EB" }]}
           >
             <Text style={styles.btnExportarTexto}>
-              📄 Compartir / Imprimir PDF
+              {exportando ? "Generando..." : "Descargar Informe PDF"}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Gráficas Visuales */}
+      {/* Gráficas Visuales (Gráfica de Torta y Barras) */}
       <GraficasFinancieras
         totalIngresos={totalIngresos}
         totalGastos={totalGastos}
@@ -303,42 +293,44 @@ export default function ReportesScreen() {
         proyeccionFinMes={infoProyeccion?.proyeccion_fin_mes}
       />
 
-      {/* Panel Algorítmico de Gastos Hormiga */}
+      {/* Auditoría y Predicción de Gastos Hormiga */}
       {infoHormiga && infoHormiga.total > 0 && (
         <View style={styles.hormigaCard}>
           <View style={styles.hormigaHeader}>
-            <Text style={styles.hormigaTitulo}>🐜 Análisis de Gastos Hormiga</Text>
+            <Text style={styles.hormigaTitulo}>Auditoría de Microgastos (Gastos Hormiga)</Text>
             <Text style={styles.hormigaMonto}>
               ${Number(infoHormiga.total).toLocaleString("es-CO")}
             </Text>
           </View>
           <Text style={styles.hormigaTexto}>
-            Se han detectado {infoHormiga.cantidad} micro-gastos este período (cafés, snacks o compras menores).
+            Se identificaron {infoHormiga.cantidad} desembolsos menores recurrentes (montos inferiores a $25.000 COP en conceptos no prioritarios).
+          </Text>
+          <Text style={[styles.hormigaTexto, { marginTop: 6 }]}>
+            Proyección anual por fuga en microcompras:{" "}
+            <Text style={{ fontWeight: "700", color: "#B45309" }}>
+              ${Number(infoHormiga.proyeccion_anual).toLocaleString("es-CO")}
+            </Text>
           </Text>
           {infoHormiga.impacto_meta ? (
-            <Text style={[styles.hormigaTexto, { color: "#F59E0B", fontWeight: "600", marginTop: 4 }]}>
-              💡 {infoHormiga.impacto_meta}
+            <Text style={[styles.hormigaTexto, { color: "#D97706", fontWeight: "600", marginTop: 6 }]}>
+              Impacto en metas: {infoHormiga.impacto_meta}
             </Text>
-          ) : (
-            <Text style={[styles.hormigaTexto, { color: colors.textSecondary, marginTop: 4 }]}>
-              Proyección anual: Si mantienes este ritmo, gastarás ${Number(infoHormiga.proyeccion_anual).toLocaleString("es-CO")} al año en micro-compras.
-            </Text>
-          )}
+          ) : null}
         </View>
       )}
 
-      {/* Proyección Predictiva Mensual */}
+      {/* Proyección Predictiva de Ritmo de Gasto */}
       {infoProyeccion && totalIngresos > 0 && (
         <View style={styles.proyeccionCard}>
-          <Text style={styles.proyeccionTitulo}>📈 Ritmo Predictivo de Gasto</Text>
+          <Text style={styles.proyeccionTitulo}>Proyección Predictiva de Gasto Mensual</Text>
           <Text style={styles.proyeccionDesc}>
-            Gasto promedio diario:{" "}
+            Gasto diario promedio actual:{" "}
             <Text style={{ fontWeight: "700", color: colors.textPrimary }}>
               ${Math.round(infoProyeccion.promedio_diario).toLocaleString("es-CO")} / día
             </Text>
           </Text>
           <Text style={styles.proyeccionDesc}>
-            Proyección a fin de mes:{" "}
+            Gasto proyectado al cierre de mes:{" "}
             <Text
               style={{
                 fontWeight: "700",
@@ -356,15 +348,15 @@ export default function ReportesScreen() {
             ]}
           >
             {infoProyeccion.excede_ingresos
-              ? `⚠️ Alerta: A este ritmo excederás tus ingresos por $${Math.round(
+              ? `Diagnóstico: A este ritmo proyectado se registrará un déficit de $${Math.round(
                   infoProyeccion.diferencia
-                ).toLocaleString("es-CO")}. Reduce compras no esenciales.`
-              : "✅ Tu ritmo de gasto actual es sostenible y te permitirá ahorrar."}
+                ).toLocaleString("es-CO")}. Se recomienda aplicar una contención del gasto discrecional.`
+              : "Diagnóstico: El ritmo de ejecución presupuestal es sostenible respecto al flujo de ingresos percibido."}
           </Text>
         </View>
       )}
 
-      {/* Detalle Regla 50/30/20 */}
+      {/* Detalle Descriptivo de la Regla 50/30/20 */}
       <View style={styles.seccionCard}>
         <View style={styles.headerSeccion}>
           <Text style={styles.seccionTitulo}>50% Necesidades Básicas</Text>
@@ -373,7 +365,7 @@ export default function ReportesScreen() {
           </Text>
         </View>
         <Text style={styles.seccionDesc}>
-          Alimentación, vivienda, servicios y salud (Categorías de prioridad alta).
+          Gastos esenciales: alimentación, vivienda, transporte y servicios de salud (Categorías de prioridad alta).
         </Text>
         <View style={styles.barraFondo}>
           <View
@@ -390,13 +382,13 @@ export default function ReportesScreen() {
 
       <View style={styles.seccionCard}>
         <View style={styles.headerSeccion}>
-          <Text style={styles.seccionTitulo}>30% Deseos y Estilo de Vida</Text>
+          <Text style={styles.seccionTitulo}>30% Deseos y Consumo Discrecional</Text>
           <Text style={styles.seccionMonto}>
             ${gastosMediaBaja.toLocaleString("es-CO")} / ${target30.toLocaleString("es-CO")}
           </Text>
         </View>
         <Text style={styles.seccionDesc}>
-          Ocio, entretenimiento, salidas y compras secundarias (Prioridad media y baja).
+          Gastos flexibles: ocio, entretenimiento, compras secundarias y salidas (Prioridad media y baja).
         </Text>
         <View style={styles.barraFondo}>
           <View
@@ -419,7 +411,7 @@ export default function ReportesScreen() {
           </Text>
         </View>
         <Text style={styles.seccionDesc}>
-          Fondo de emergencia, aportes a tus metas activas y ahorro a largo plazo.
+          Reserva de capital, amortización prioritaria y cumplimiento de metas de ahorro programadas.
         </Text>
         <View style={styles.barraFondo}>
           <View
@@ -437,15 +429,15 @@ export default function ReportesScreen() {
         </View>
       </View>
 
-      {/* Consejo Financiero */}
+      {/* Diagnóstico Ejecutivo */}
       <View style={styles.tipCard}>
-        <Text style={styles.tipIcon}>💡 Consejo Financiero</Text>
+        <Text style={styles.tipTitulo}>Diagnóstico Financiero</Text>
         <Text style={styles.tipText}>
           {totalIngresos === 0
-            ? "Registra tus ingresos mensuales para calcular tu presupuesto automático 50/30/20."
+            ? "Es necesario registrar los ingresos percibidos en el período para estructurar el límite objetivo del 50/30/20."
             : totalGastos > totalIngresos * 0.8
-            ? "Tus gastos están superando el 80% de tus ingresos. Procura reducir compras no esenciales para no comprometer tus metas."
-            : "¡Muy bien! Estás manteniendo tus gastos dentro del límite recomendado para garantizar tu cuota de ahorro."}
+            ? "El volumen de egresos supera el 80% del flujo de ingresos. Se requiere una contención de compras secundarias para preservar la capacidad de ahorro."
+            : "La distribución presupuestal se mantiene en rangos prudentes, permitiendo destinar capital al fondo de ahorro."}
         </Text>
       </View>
 
@@ -463,14 +455,15 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "700",
   },
   subtitulo: {
     color: colors.textSecondary,
     fontSize: 13,
-    marginBottom: 20,
+    marginBottom: 18,
     marginTop: 4,
+    lineHeight: 18,
   },
   cardResumen: {
     backgroundColor: colors.card,
@@ -489,9 +482,11 @@ const styles = StyleSheet.create({
   },
   resumenLabel: {
     color: colors.textSecondary,
-    fontSize: 11,
+    fontSize: 10,
     textTransform: "uppercase",
     marginBottom: 4,
+    fontWeight: "600",
+    textAlign: "center",
   },
   resumenValor: {
     fontSize: 15,
@@ -512,14 +507,15 @@ const styles = StyleSheet.create({
   },
   exportarTitulo: {
     color: colors.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     marginBottom: 4,
   },
   exportarDesc: {
     color: colors.textSecondary,
     fontSize: 12,
-    marginBottom: 12,
+    marginBottom: 14,
+    lineHeight: 16,
   },
   exportarBtnRow: {
     flexDirection: "row",
@@ -528,7 +524,7 @@ const styles = StyleSheet.create({
   btnExportar: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -540,9 +536,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   hormigaCard: {
-    backgroundColor: "rgba(245, 158, 11, 0.08)",
+    backgroundColor: "rgba(245, 158, 11, 0.06)",
     borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.3)",
+    borderColor: "rgba(245, 158, 11, 0.25)",
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
@@ -554,12 +550,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   hormigaTitulo: {
-    color: "#F59E0B",
-    fontSize: 15,
+    color: "#D97706",
+    fontSize: 14,
     fontWeight: "700",
+    flex: 1,
   },
   hormigaMonto: {
-    color: "#F59E0B",
+    color: "#D97706",
     fontSize: 16,
     fontWeight: "800",
   },
@@ -609,7 +606,7 @@ const styles = StyleSheet.create({
   },
   seccionTitulo: {
     color: colors.textPrimary,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
   },
   seccionMonto: {
@@ -633,14 +630,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   tipCard: {
-    backgroundColor: "rgba(99, 102, 241, 0.1)",
+    backgroundColor: "rgba(99, 102, 241, 0.08)",
     borderWidth: 1,
-    borderColor: "rgba(99, 102, 241, 0.3)",
+    borderColor: "rgba(99, 102, 241, 0.25)",
     padding: 16,
     borderRadius: 16,
     marginTop: 4,
   },
-  tipIcon: {
+  tipTitulo: {
     color: colors.textPrimary,
     fontSize: 14,
     fontWeight: "700",
