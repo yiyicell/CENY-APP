@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/.venv/
+.venv/
+env/
+venv/
+ENV/
+
+# Environment Variables
+.env
+.env.local
+backend/.env
+backend/.env.local
+frontend/.env.local
+
+# Node / React
+node_modules/
+.expo/
+dist/
+web-build/
+
+# VS Code / IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
