@@ -115,8 +115,9 @@ export default function HomeScreen() {
     cargarDatos();
   }
 
-  // Saldo libre real disponible para gastar
-  const saldoLibre = totalIngresos - totalGastos - totalAhorrado;
+  // Saldo libre real disponible para gastar (no menor a 0)
+  const saldoCalculado = totalIngresos - totalGastos - totalAhorrado;
+  const saldoLibre = Math.max(0, saldoCalculado);
   const porcentajeGastado = totalIngresos > 0 ? Math.round((totalGastos / totalIngresos) * 100) : 0;
 
   return (
@@ -147,15 +148,34 @@ export default function HomeScreen() {
       <View style={styles.saldoCard}>
         <View style={styles.saldoHeader}>
           <Text style={styles.saldoLabel}>Saldo libre para gastar</Text>
-          <View style={styles.badgeReserva}>
-            <Text style={styles.badgeReservaTexto}>Ahorro protegido</Text>
+          <View
+            style={[
+              styles.badgeReserva,
+              saldoCalculado < 0 && {
+                backgroundColor: "#EF444422",
+                borderColor: "#EF444455",
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.badgeReservaTexto,
+                saldoCalculado < 0 && { color: "#F87171" },
+              ]}
+            >
+              {saldoCalculado < 0
+                ? "Sin saldo libre"
+                : totalAhorrado > 0
+                ? "Ahorro protegido"
+                : "Disponible"}
+            </Text>
           </View>
         </View>
 
         <Text
           style={[
             styles.saldoValor,
-            saldoLibre < 0 ? { color: colors.danger } : { color: colors.success },
+            saldoLibre === 0 ? { color: colors.textSecondary } : { color: colors.success },
           ]}
         >
           ${saldoLibre.toLocaleString("es-CO")}

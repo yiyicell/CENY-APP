@@ -18,6 +18,7 @@ type Props = {
   gastosMediaBaja: number;
   categoriasDesglose: CategoriaDesglose[];
   proyeccionFinMes?: number;
+  mostrarRegla503020?: boolean;
 };
 
 const PALETA_COLORES = [
@@ -36,6 +37,7 @@ export function GraficasFinancieras({
   gastosAlta,
   gastosMediaBaja,
   categoriasDesglose,
+  mostrarRegla503020 = false,
 }: Props) {
   const target50 = totalIngresos * 0.5;
   const target30 = totalIngresos * 0.3;
@@ -191,95 +193,97 @@ export function GraficasFinancieras({
         </View>
       )}
 
-      {/* 3. Gráfica Comparativa Regla 50/30/20 (Presupuesto vs Real) */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Comparativa Regla 50 / 30 / 20</Text>
-        <Text style={styles.cardSubtitle}>
-          Evaluación de ejecución presupuestal frente a límites recomendados
-        </Text>
+      {/* 3. Gráfica Comparativa Regla 50/30/20 (Opcional si se activa la prop) */}
+      {mostrarRegla503020 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Comparativa Regla 50 / 30 / 20</Text>
+          <Text style={styles.cardSubtitle}>
+            Evaluación de ejecución presupuestal frente a límites recomendados
+          </Text>
 
-        {/* 50% Necesidades */}
-        <View style={styles.comparativaItem}>
-          <View style={styles.comparativaHeader}>
-            <Text style={styles.comparativaLabel}>50% Necesidades Básicas</Text>
-            <Text
-              style={[
-                styles.comparativaEstado,
-                gastosAlta > target50 ? { color: colors.danger } : { color: colors.success },
-              ]}
-            >
-              ${gastosAlta.toLocaleString("es-CO")} / ${target50.toLocaleString("es-CO")}
-            </Text>
+          {/* 50% Necesidades */}
+          <View style={styles.comparativaItem}>
+            <View style={styles.comparativaHeader}>
+              <Text style={styles.comparativaLabel}>50% Necesidades Básicas</Text>
+              <Text
+                style={[
+                  styles.comparativaEstado,
+                  gastosAlta > target50 ? { color: colors.danger } : { color: colors.success },
+                ]}
+              >
+                ${gastosAlta.toLocaleString("es-CO")} / ${target50.toLocaleString("es-CO")}
+              </Text>
+            </View>
+            <View style={styles.barraFondo}>
+              <View
+                style={[
+                  styles.barraProgreso,
+                  {
+                    width: `${Math.min(100, target50 > 0 ? (gastosAlta / target50) * 100 : 0)}%`,
+                    backgroundColor: gastosAlta > target50 ? colors.danger : colors.primary,
+                  },
+                ]}
+              />
+            </View>
           </View>
-          <View style={styles.barraFondo}>
-            <View
-              style={[
-                styles.barraProgreso,
-                {
-                  width: `${Math.min(100, target50 > 0 ? (gastosAlta / target50) * 100 : 0)}%`,
-                  backgroundColor: gastosAlta > target50 ? colors.danger : colors.primary,
-                },
-              ]}
-            />
+
+          {/* 30% Deseos */}
+          <View style={styles.comparativaItem}>
+            <View style={styles.comparativaHeader}>
+              <Text style={styles.comparativaLabel}>30% Deseos y Consumo Discrecional</Text>
+              <Text
+                style={[
+                  styles.comparativaEstado,
+                  gastosMediaBaja > target30 ? { color: colors.danger } : { color: "#F59E0B" },
+                ]}
+              >
+                ${gastosMediaBaja.toLocaleString("es-CO")} / ${target30.toLocaleString("es-CO")}
+              </Text>
+            </View>
+            <View style={styles.barraFondo}>
+              <View
+                style={[
+                  styles.barraProgreso,
+                  {
+                    width: `${Math.min(
+                      100,
+                      target30 > 0 ? (gastosMediaBaja / target30) * 100 : 0
+                    )}%`,
+                    backgroundColor: gastosMediaBaja > target30 ? colors.danger : "#F59E0B",
+                  },
+                ]}
+              />
+            </View>
+          </View>
+
+          {/* 20% Ahorro */}
+          <View style={styles.comparativaItem}>
+            <View style={styles.comparativaHeader}>
+              <Text style={styles.comparativaLabel}>20% Ahorro e Inversión</Text>
+              <Text style={[styles.comparativaEstado, { color: colors.success }]}>
+                ${Math.max(0, saldoDisponible).toLocaleString("es-CO")} / $
+                {target20.toLocaleString("es-CO")}
+              </Text>
+            </View>
+            <View style={styles.barraFondo}>
+              <View
+                style={[
+                  styles.barraProgreso,
+                  {
+                    width: `${Math.min(
+                      100,
+                      target20 > 0 && saldoDisponible > 0
+                        ? (saldoDisponible / target20) * 100
+                        : 0
+                    )}%`,
+                    backgroundColor: colors.success,
+                  },
+                ]}
+              />
+            </View>
           </View>
         </View>
-
-        {/* 30% Deseos */}
-        <View style={styles.comparativaItem}>
-          <View style={styles.comparativaHeader}>
-            <Text style={styles.comparativaLabel}>30% Deseos y Consumo Discrecional</Text>
-            <Text
-              style={[
-                styles.comparativaEstado,
-                gastosMediaBaja > target30 ? { color: colors.danger } : { color: "#F59E0B" },
-              ]}
-            >
-              ${gastosMediaBaja.toLocaleString("es-CO")} / ${target30.toLocaleString("es-CO")}
-            </Text>
-          </View>
-          <View style={styles.barraFondo}>
-            <View
-              style={[
-                styles.barraProgreso,
-                {
-                  width: `${Math.min(
-                    100,
-                    target30 > 0 ? (gastosMediaBaja / target30) * 100 : 0
-                  )}%`,
-                  backgroundColor: gastosMediaBaja > target30 ? colors.danger : "#F59E0B",
-                },
-              ]}
-            />
-          </View>
-        </View>
-
-        {/* 20% Ahorro */}
-        <View style={styles.comparativaItem}>
-          <View style={styles.comparativaHeader}>
-            <Text style={styles.comparativaLabel}>20% Ahorro e Inversión</Text>
-            <Text style={[styles.comparativaEstado, { color: colors.success }]}>
-              ${Math.max(0, saldoDisponible).toLocaleString("es-CO")} / $
-              {target20.toLocaleString("es-CO")}
-            </Text>
-          </View>
-          <View style={styles.barraFondo}>
-            <View
-              style={[
-                styles.barraProgreso,
-                {
-                  width: `${Math.min(
-                    100,
-                    target20 > 0 && saldoDisponible > 0
-                      ? (saldoDisponible / target20) * 100
-                      : 0
-                  )}%`,
-                  backgroundColor: colors.success,
-                },
-              ]}
-            />
-          </View>
-        </View>
-      </View>
+      )}
     </View>
   );
 }
