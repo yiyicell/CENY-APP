@@ -120,6 +120,20 @@ class TestGestionMetas(unittest.TestCase):
         # 100.000 / 2 = 50.000 / quincena
         self.assertEqual(res["cuota_sugerida"], 50000.0)
 
+    def test_meta_proxima_a_vencer(self):
+        # Meta a 5 días con 0% ahorrado debe marcarse "por_vencer"
+        fecha_obj = date.today() + timedelta(days=5)
+        meta = {
+            "id": "33333333-3333-3333-3333-333333333333",
+            "valor_objetivo": 500000.0,
+            "frecuencia_ahorro": "mensual",
+            "fecha_objetivo": fecha_obj.isoformat(),
+            "estado": "por_cumplir"
+        }
+        res = calcular_metricas_meta(meta, [])
+        self.assertEqual(res["estado_seguimiento"], "por_vencer")
+        self.assertIn("Plazo crítico", res["mensaje_seguimiento"])
+
 class TestEndpointsFastAPI(unittest.TestCase):
 
     def setUp(self):

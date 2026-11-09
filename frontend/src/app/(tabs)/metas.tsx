@@ -34,7 +34,7 @@ type Meta = {
   dias_restantes?: number;
   dias_totales?: number;
   ritmo_esperado_porcentaje?: number;
-  estado_seguimiento?: "cumplida" | "al_dia" | "atrasado" | "vencida";
+  estado_seguimiento?: "cumplida" | "al_dia" | "atrasado" | "vencida" | "por_vencer";
   mensaje_seguimiento?: string;
   aportes?: Aporte[];
 };
@@ -153,7 +153,25 @@ export default function MetasScreen() {
             const objetivo = Number(item.valor_objetivo);
             const progreso = objetivo > 0 ? Math.min(aportado / objetivo, 1) : 0;
             const esCumplida = item.estado === "cumplido" || progreso >= 1;
-            const estadoSeg = item.estado_seguimiento || (esCumplida ? "cumplida" : "al_dia");
+
+            // Cálculo local de días restantes para consistencia inmediata
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            const fechaObj = new Date(item.fecha_objetivo + "T00:00:00");
+            const diasRestantes = Math.ceil(
+              (fechaObj.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+            );
+
+            let estadoSeg = item.estado_seguimiento;
+            if (!estadoSeg) {
+              if (esCumplida) estadoSeg = "cumplida";
+              else if (diasRestantes <= 0) estadoSeg = "vencida";
+              else if (diasRestantes <= 7 && progreso < 0.95) estadoSeg = "por_vencer";
+              else estadoSeg = "al_dia";
+            } else if (!esCumplida && diasRestantes <= 7 && progreso < 0.95) {
+              estadoSeg = "por_vencer";
+            }
+
             const expandida = metaExpandida === item.id;
 
             return (
@@ -167,9 +185,13 @@ export default function MetasScreen() {
                       styles.badge,
                       esCumplida
                         ? styles.badgeCumplida
-                        : estadoSeg === "al_dia"
-                        ? styles.badgeAlDia
-                        : styles.badgeAtrasada,
+                        : estadoSeg === "vencida"
+                        ? styles.badgeVencida
+                        : estadoSeg === "por_vencer"
+                        ? styles.badgePorVencer
+                        : estadoSeg === "atrasado"
+                        ? styles.badgeAtrasada
+                        : styles.badgeAlDia,
                     ]}
                   >
                     <Text
@@ -177,16 +199,24 @@ export default function MetasScreen() {
                         styles.badgeText,
                         esCumplida
                           ? styles.badgeTextCumplida
-                          : estadoSeg === "al_dia"
-                          ? styles.badgeTextAlDia
-                          : styles.badgeTextAtrasada,
+                          : estadoSeg === "vencida"
+                          ? styles.badgeTextVencida
+                          : estadoSeg === "por_vencer"
+                          ? styles.badgeTextPorVencer
+                          : estadoSeg === "atrasado"
+                          ? styles.badgeTextAtrasada
+                          : styles.badgeTextAlDia,
                       ]}
                     >
                       {esCumplida
-                        ? "Completada 🎉"
-                        : estadoSeg === "al_dia"
-                        ? "Al día 🚀"
-                        : "Atrasada ⚠️"}
+                        ? "Cumplida"
+                        : estadoSeg === "vencida"
+                        ? "Plazo vencido"
+                        : estadoSeg === "por_vencer"
+                        ? `Por vencer (${Math.max(0, diasRestantes)}d)`
+                        : estadoSeg === "atrasado"
+                        ? "Atrasada"
+                        : "Al día"}
                     </Text>
                   </View>
                 </View>
@@ -207,16 +237,28 @@ export default function MetasScreen() {
                   />
                 </View>
 
+                {/* Alerta Destacada si está Por Vencer */}
+                {!esCumplida && estadoSeg === "por_vencer" && (
+                  <View style={styles.avisoPorVencerBox}>
+                    <Text style={styles.avisoPorVencerTitulo}>
+                      Atención: Plazo crítico para cumplir la meta
+                    </Text>
+                    <Text style={styles.avisoPorVencerTexto}>
+                      Restan solo {Math.max(0, diasRestantes)} días (límite: {formatearFechaCO(item.fecha_objetivo)}) y aún falta reunir ${(objetivo - aportado).toLocaleString("es-CO")}. Se requiere acelerar los aportes para alcanzar el objetivo.
+                    </Text>
+                  </View>
+                )}
+
                 {/* Panel de Seguimiento Temporal y Cuota */}
                 {!esCumplida && (
                   <View style={styles.seguimientoBox}>
                     <Text style={styles.seguimientoTexto}>
-                      ⏱️ {item.mensaje_seguimiento || "Mantén tus aportes para llegar a tiempo."}
+                      {item.mensaje_seguimiento || (estadoSeg === "por_vencer" ? `Restan ${Math.max(0, diasRestantes)} días para la fecha objetivo.` : "Mantén tus aportes programados para cumplir tu meta a tiempo.")}
                     </Text>
 
                     {item.cuota_sugerida !== undefined && (
                       <Text style={[styles.seguimientoTexto, { marginTop: 4, fontWeight: "600" }]}>
-                        💡 Cuota sugerida: ${Math.round(item.cuota_sugerida).toLocaleString("es-CO")} /{" "}
+                        Cuota sugerida: ${Math.round(item.cuota_sugerida).toLocaleString("es-CO")} /{" "}
                         {item.frecuencia_ahorro ?? "mes"} ({item.periodos_restantes ?? 1} período(s) restantes)
                       </Text>
                     )}
@@ -347,6 +389,14 @@ const styles = StyleSheet.create({
   badgeCumplida: {
     backgroundColor: "rgba(59, 130, 246, 0.15)",
   },
+  badgePorVencer: {
+    backgroundColor: "rgba(245, 158, 11, 0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.4)",
+  },
+  badgeVencida: {
+    backgroundColor: "rgba(100, 116, 139, 0.2)",
+  },
   badgeText: {
     fontSize: 11,
     fontWeight: "700",
@@ -359,6 +409,12 @@ const styles = StyleSheet.create({
   },
   badgeTextCumplida: {
     color: "#60A5FA",
+  },
+  badgeTextPorVencer: {
+    color: "#FBBF24",
+  },
+  badgeTextVencida: {
+    color: "#94A3B8",
   },
   montos: {
     color: colors.success,
@@ -375,6 +431,25 @@ const styles = StyleSheet.create({
   barraRelleno: {
     height: 8,
     backgroundColor: colors.success,
+  },
+  avisoPorVencerBox: {
+    marginTop: 10,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.35)",
+  },
+  avisoPorVencerTitulo: {
+    color: "#FBBF24",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  avisoPorVencerTexto: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
   },
   seguimientoBox: {
     marginTop: 10,

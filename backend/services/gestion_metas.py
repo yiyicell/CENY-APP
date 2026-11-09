@@ -40,17 +40,26 @@ def calcular_metricas_meta(meta: dict, aportes: List[dict]) -> dict:
     
     if total_ahorrado >= valor_objetivo or meta.get("estado") == "cumplido":
         estado_seguimiento = "cumplida"
-        mensaje_seguimiento = "¡Meta cumplida exitosamente! 🎉"
+        mensaje_seguimiento = "Meta cumplida en su totalidad."
     elif dias_restantes <= 0:
         estado_seguimiento = "vencida"
-        mensaje_seguimiento = "La fecha objetivo ha pasado. Puedes seguir aportando para completarla."
-    elif progreso >= ritmo_esperado:
-        estado_seguimiento = "al_dia"
-        mensaje_seguimiento = "¡Excelente ritmo! Vas según lo programado para alcanzar tu objetivo a tiempo 🚀"
-    else:
+        mensaje_seguimiento = "La fecha objetivo ha vencido. Puedes seguir realizando aportes para completarla."
+    elif dias_restantes <= 7 and progreso < 95.0:
+        estado_seguimiento = "por_vencer"
+        mensaje_seguimiento = f"Plazo crítico: Restan solo {dias_restantes} día(s) para la fecha límite ({fecha_obj.strftime('%d/%m/%Y')}) y aún falta el {100 - progreso:.1f}% del capital. Se requiere aportar inmediatamente."
+    elif dias_restantes <= 14 and progreso == 0.0 and dias_totales <= 14:
+        estado_seguimiento = "por_vencer"
+        mensaje_seguimiento = f"Plazo corto: Restan {dias_restantes} días para reunir el capital total sin aportes registrados. Se aconseja iniciar aportes prioritarios."
+    elif progreso < ritmo_esperado:
         estado_seguimiento = "atrasado"
         diferencia_abs = abs(diferencia_ritmo)
-        mensaje_seguimiento = f"Llevas un retraso de ${diferencia_abs:,.0f} respecto al cronograma ideal."
+        mensaje_seguimiento = f"Retraso acumulado: Faltan ${diferencia_abs:,.0f} COP para igualar el cronograma esperado a hoy."
+    elif dias_transcurridos == 0 and total_ahorrado == 0:
+        estado_seguimiento = "al_dia"
+        mensaje_seguimiento = f"Meta iniciada hoy. Restan {dias_restantes} días; realiza tu primer aporte para comenzar el avance."
+    else:
+        estado_seguimiento = "al_dia"
+        mensaje_seguimiento = "Ritmo óptimo: El avance acumulado cumple con el cronograma previsto hacia la fecha límite."
 
     if dias_restantes <= 0:
         periodos_restantes = 1
