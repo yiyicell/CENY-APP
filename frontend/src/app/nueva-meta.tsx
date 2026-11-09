@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Text,
   TextInput,
@@ -9,6 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { PantallaFormulario } from "@/components/PantallaFormulario";
 import { registrarMetaAPI } from "@/services/api";
@@ -20,8 +21,18 @@ export default function NuevaMetaScreen() {
   const [objetivo, setObjetivo] = useState("");
   const [fecha, setFecha] = useState("");
   const [frecuencia, setFrecuencia] = useState<"mensual" | "quincenal">("mensual");
+  const [totalIngresos, setTotalIngresos] = useState(0);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function cargarIngresos() {
+      const { data } = await supabase.from("ingresos").select("valor");
+      const tot = (data || []).reduce((acc, i) => acc + Number(i.valor), 0);
+      setTotalIngresos(tot);
+    }
+    cargarIngresos();
+  }, []);
 
   async function handleGuardar() {
     const valor = Number(objetivo);
@@ -68,11 +79,64 @@ export default function NuevaMetaScreen() {
     }
   }
 
+  // Cálculo en vivo de viabilidad algorítmica
+  const valorNum = Number(objetivo) || 0;
+  let diagnosticoViabilidad: {
+    cuota: number;
+    cuotaMensual: number;
+    periodos: number;
+    pctIngreso: number;
+    tipo: "viable" | "moderada" | "dificil" | "sin_ingresos";
+    mensaje: string;
+  } | null = null;
+
+  if (valorNum > 0 && esFechaValida(fecha)) {
+    const partes = fecha.split("/").map(Number);
+    const d = partes[0];
+    const m = partes[1];
+    const y = partes[2];
+    const fechaLimite = new Date(y, m - 1, d);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const difMs = fechaLimite.getTime() - hoy.getTime();
+    const dias = Math.max(1, Math.ceil(difMs / (1000 * 60 * 60 * 24)));
+    const periodos = frecuencia === "mensual" ? Math.max(1, Math.ceil(dias / 30)) : Math.max(1, Math.ceil(dias / 15));
+    const cuota = Math.round(valorNum / periodos);
+    const cuotaMensual = frecuencia === "quincenal" ? cuota * 2 : cuota;
+    const pctIngreso = totalIngresos > 0 ? Math.round((cuotaMensual / totalIngresos) * 100) : 0;
+
+    let tipo: "viable" | "moderada" | "dificil" | "sin_ingresos" = "viable";
+    let mensaje = "";
+
+    if (totalIngresos === 0) {
+      tipo = "sin_ingresos";
+      mensaje = `Cuota estimada: $${cuota.toLocaleString("es-CO")} cada ${frecuencia} (${periodos} períodos). Registra tus ingresos en Inicio para evaluar su viabilidad frente a la regla 50/30/20.`;
+    } else if (pctIngreso <= 20) {
+      tipo = "viable";
+      mensaje = `Meta Altamente Viable: La cuota mensual ($${cuotaMensual.toLocaleString("es-CO")}) representa el ${pctIngreso}% de tus ingresos mensuales, encajando dentro del 20% de ahorro recomendado.`;
+    } else if (pctIngreso <= 40) {
+      tipo = "moderada";
+      mensaje = `Meta Moderadamente Exigente: La cuota mensual ($${cuotaMensual.toLocaleString("es-CO")}) requiere el ${pctIngreso}% de tus ingresos. Para alcanzarla a tiempo deberás moderar tus compras en ocio.`;
+    } else {
+      tipo = "dificil";
+      mensaje = `Meta de Alta Dificultad: La cuota mensual ($${cuotaMensual.toLocaleString("es-CO")}) absorbe el ${pctIngreso}% de tus ingresos. Te sugerimos ampliar el plazo para evitar déficit.`;
+    }
+
+    diagnosticoViabilidad = {
+      cuota,
+      cuotaMensual,
+      periodos,
+      pctIngreso,
+      tipo,
+      mensaje,
+    };
+  }
+
   return (
     <PantallaFormulario>
       <Text style={styles.title}>Nueva Meta de Ahorro</Text>
       <Text style={styles.subtitulo}>
-        Define un objetivo y fecha límite. Calcularemos automáticamente tu cuota de ahorro recomendada y le haremos seguimiento.
+        Define un objetivo y fecha límite. Evaluaremos en tiempo real su viabilidad financiera para ayudarte a cumplirla conscientemente.
       </Text>
 
       <Text style={styles.label}>NOMBRE DE LA META</Text>
@@ -139,6 +203,49 @@ export default function NuevaMetaScreen() {
         autoCapitalize="none"
         style={styles.input}
       />
+
+      {/* Asistente de Viabilidad Financiera en Vivo */}
+      {diagnosticoViabilidad && (
+        <View
+          style={[
+            styles.viabilidadCard,
+            diagnosticoViabilidad.tipo === "viable"
+              ? styles.viabilidadCardViable
+              : diagnosticoViabilidad.tipo === "moderada"
+              ? styles.viabilidadCardModerada
+              : diagnosticoViabilidad.tipo === "dificil"
+              ? styles.viabilidadCardDificil
+              : styles.viabilidadCardNeutro,
+          ]}
+        >
+          <View style={styles.viabilidadHeader}>
+            <Text style={styles.viabilidadTitulo}>
+              {diagnosticoViabilidad.tipo === "viable"
+                ? "Cuota Recomendada: Meta Viable"
+                : diagnosticoViabilidad.tipo === "moderada"
+                ? "Cuota Recomendada: Meta Exigente"
+                : diagnosticoViabilidad.tipo === "dificil"
+                ? "Cuota Recomendada: Alta Dificultad"
+                : "Cuota de Ahorro Calculada"}
+            </Text>
+            <Text
+              style={[
+                styles.viabilidadCuota,
+                diagnosticoViabilidad.tipo === "viable"
+                  ? { color: colors.success }
+                  : diagnosticoViabilidad.tipo === "moderada"
+                  ? { color: "#F59E0B" }
+                  : diagnosticoViabilidad.tipo === "dificil"
+                  ? { color: colors.danger }
+                  : { color: colors.textPrimary },
+              ]}
+            >
+              ${diagnosticoViabilidad.cuota.toLocaleString("es-CO")} / {frecuencia}
+            </Text>
+          </View>
+          <Text style={styles.viabilidadMensaje}>{diagnosticoViabilidad.mensaje}</Text>
+        </View>
+      )}
 
       {error ? (
         <Text style={{ color: colors.danger, marginBottom: 12 }}>{error}</Text>
@@ -217,6 +324,50 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginTop: 10,
+  },
+  viabilidadCard: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  viabilidadCardViable: {
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+    borderColor: "rgba(16, 185, 129, 0.3)",
+  },
+  viabilidadCardModerada: {
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    borderColor: "rgba(245, 158, 11, 0.3)",
+  },
+  viabilidadCardDificil: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderColor: "rgba(239, 68, 68, 0.3)",
+  },
+  viabilidadCardNeutro: {
+    backgroundColor: colors.card,
+    borderColor: colors.cardBorder,
+  },
+  viabilidadHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  viabilidadTitulo: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+    flex: 1,
+  },
+  viabilidadCuota: {
+    fontSize: 14,
+    fontWeight: "800",
+    marginLeft: 8,
+  },
+  viabilidadMensaje: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
   buttonText: {
     color: colors.background,

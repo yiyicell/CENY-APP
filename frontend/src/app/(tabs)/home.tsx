@@ -120,6 +120,52 @@ export default function HomeScreen() {
   const saldoLibre = Math.max(0, saldoCalculado);
   const porcentajeGastado = totalIngresos > 0 ? Math.round((totalGastos / totalIngresos) * 100) : 0;
 
+  // Cálculo de Salud Financiera CENY (Score 0 - 100)
+  let scoreSalud = 100;
+  let estadoSalud = "Excelente";
+  let colorSalud = colors.success;
+  let consejoSalud = "Tu balance presupuestal se mantiene en condiciones ideales.";
+
+  if (totalIngresos === 0) {
+    scoreSalud = 50;
+    estadoSalud = "Sin Datos";
+    colorSalud = colors.textSecondary;
+    consejoSalud = "Registra tus ingresos mensuales para calcular tu salud financiera.";
+  } else {
+    let deducciones = 0;
+    if (totalGastos > totalIngresos) {
+      deducciones += 40;
+    } else if (porcentajeGastado > 80) {
+      deducciones += 25;
+    }
+    if (totalAhorrado === 0 && saldoCalculado <= 0) {
+      deducciones += 20;
+    }
+    if (saldoCalculado <= 0) {
+      deducciones += 15;
+    }
+
+    scoreSalud = Math.max(15, Math.min(100, 100 - deducciones));
+
+    if (scoreSalud >= 85) {
+      estadoSalud = "Excelente";
+      colorSalud = colors.success;
+      consejoSalud = "Presupuesto equilibrado y capacidad de ahorro sostenida.";
+    } else if (scoreSalud >= 70) {
+      estadoSalud = "Saludable";
+      colorSalud = "#3B82F6";
+      consejoSalud = "Distribución controlada; continúa reforzando tus metas de ahorro.";
+    } else if (scoreSalud >= 50) {
+      estadoSalud = "En Observación";
+      colorSalud = "#F59E0B";
+      consejoSalud = "Se sugiere moderar compras discrecionales para recuperar margen de ahorro.";
+    } else {
+      estadoSalud = "En Riesgo";
+      colorSalud = colors.danger;
+      consejoSalud = "Los egresos superan los ingresos. Se requiere contención prioritaria de gastos.";
+    }
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -236,6 +282,34 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Tarjeta de Salud Financiera CENY */}
+      <View style={styles.saludCard}>
+        <View style={styles.saludHeader}>
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text style={styles.saludLabel}>Salud Financiera CENY</Text>
+            <Text style={styles.saludConsejo}>{consejoSalud}</Text>
+          </View>
+          <View
+            style={[
+              styles.saludBadge,
+              { backgroundColor: colorSalud + "22", borderColor: colorSalud + "44" },
+            ]}
+          >
+            <Text style={[styles.saludScore, { color: colorSalud }]}>{scoreSalud}/100</Text>
+            <Text style={[styles.saludEstado, { color: colorSalud }]}>{estadoSalud}</Text>
+          </View>
+        </View>
+
+        <View style={styles.saludBarraFondo}>
+          <View
+            style={[
+              styles.saludBarraProgreso,
+              { width: `${scoreSalud}%`, backgroundColor: colorSalud },
+            ]}
+          />
+        </View>
+      </View>
+
       {/* Tarjetas Informativas */}
       <View style={styles.filaCards}>
         <View style={styles.miniCard}>
@@ -261,6 +335,29 @@ export default function HomeScreen() {
             ${totalAhorrado.toLocaleString("es-CO")} acumulados
           </Text>
         </View>
+      </View>
+
+      {/* Reto Semanal de Ahorro */}
+      <View style={styles.retoCard}>
+        <View style={styles.retoHeader}>
+          <Text style={styles.retoIcono}>🎯</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.retoTitulo}>Reto de Ahorro de la Semana</Text>
+            <Text style={styles.retoDesc}>
+              {metasActivas > 0
+                ? "Semana Cero Fugas: Evita 2 microcompras no esenciales en café o snacks y abona $10.000 COP a tu meta activa."
+                : "Reto Inicial: Define tu primer objetivo de ahorro para 30 días y da el paso inicial hoy mismo."}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push(metasActivas > 0 ? "/metas" : "/nueva-meta")}
+          style={styles.btnReto}
+        >
+          <Text style={styles.btnRetoTexto}>
+            {metasActivas > 0 ? "+ Cumplir Reto en Metas" : "+ Crear Meta de Ahorro"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Selector de Recientes: Gastos vs Ingresos */}
@@ -557,5 +654,97 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  saludCard: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  saludHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  saludLabel: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  saludConsejo: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  saludBadge: {
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  saludScore: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  saludEstado: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  saludBarraFondo: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.cardBorder,
+    overflow: "hidden",
+  },
+  saludBarraProgreso: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  retoCard: {
+    backgroundColor: "rgba(99, 102, 241, 0.08)",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(99, 102, 241, 0.25)",
+  },
+  retoHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  retoIcono: {
+    fontSize: 22,
+    marginRight: 10,
+    marginTop: 1,
+  },
+  retoTitulo: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  retoDesc: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  btnReto: {
+    backgroundColor: colors.primary,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  btnRetoTexto: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

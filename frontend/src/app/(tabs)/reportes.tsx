@@ -33,6 +33,7 @@ const COLORES_CATEGORIAS: Record<string, string> = {
 
 export default function ReportesScreen() {
   const [tabActiva, setTabActiva] = useState<TabReporte>("distribucion");
+  const [pctSimulacion, setPctSimulacion] = useState<number>(30);
   const [totalIngresos, setTotalIngresos] = useState(0);
   const [totalGastos, setTotalGastos] = useState(0);
   const [gastosAlta, setGastosAlta] = useState(0);
@@ -218,6 +219,17 @@ export default function ReportesScreen() {
 
   const infoHormiga = analisisAPI?.gastos_hormiga;
   const infoProyeccion = analisisAPI?.proyeccion_mensual;
+
+  // Cálculos para el Simulador de Impacto en Metas
+  const baseOptimizable = (infoHormiga?.total || 0) > 0 ? Number(infoHormiga.total) : gastosMediaBaja;
+  const montoMensualLiberado = Math.round(baseOptimizable * (pctSimulacion / 100));
+  const montoAnualLiberado = montoMensualLiberado * 12;
+  const metasActivas = (datosExportar?.metas || []).filter((m) => m.estado !== "cumplido");
+  const primeraMeta = metasActivas[0];
+  const diasAcelerados =
+    primeraMeta && primeraMeta.valor_objetivo > 0 && montoMensualLiberado > 0
+      ? Math.min(120, Math.max(5, Math.ceil((montoMensualLiberado / (primeraMeta.valor_objetivo / 6)) * 30)))
+      : 25;
 
   return (
     <ScrollView
@@ -505,6 +517,74 @@ export default function ReportesScreen() {
                 ) : null}
               </>
             ) : null}
+          </View>
+
+          {/* Simulador Interactivo de Decisión y Aceleración de Ahorro */}
+          <View style={styles.simuladorCard}>
+            <Text style={styles.simuladorTitulo}>Simulador de Impacto en Metas</Text>
+            <Text style={styles.simuladorDesc}>
+              Evalúa en tiempo real cuánto dinero liberas y cuánto aceleras tus metas si recortas un porcentaje de tus gastos prescindibles o microgastos:
+            </Text>
+
+            {/* Chips de porcentaje */}
+            <View style={styles.simuladorChipsRow}>
+              {[15, 30, 50].map((pct) => (
+                <TouchableOpacity
+                  key={pct}
+                  onPress={() => setPctSimulacion(pct)}
+                  style={[
+                    styles.simuladorChip,
+                    pctSimulacion === pct && styles.simuladorChipActivo,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.simuladorChipTexto,
+                      pctSimulacion === pct && styles.simuladorChipTextoActivo,
+                    ]}
+                  >
+                    Optimizar {pct}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Resultados de la Simulación */}
+            <View style={styles.simuladorResultadosRow}>
+              <View style={styles.simuladorCol}>
+                <Text style={styles.simuladorMontoLabel}>Liberado al mes</Text>
+                <Text style={[styles.simuladorMonto, { color: colors.success }]}>
+                  +${montoMensualLiberado.toLocaleString("es-CO")}
+                </Text>
+              </View>
+
+              <View style={styles.simuladorDivider} />
+
+              <View style={styles.simuladorCol}>
+                <Text style={styles.simuladorMontoLabel}>Ahorro anual</Text>
+                <Text style={[styles.simuladorMonto, { color: "#3B82F6" }]}>
+                  +${montoAnualLiberado.toLocaleString("es-CO")}
+                </Text>
+              </View>
+
+              {primeraMeta ? (
+                <>
+                  <View style={styles.simuladorDivider} />
+                  <View style={styles.simuladorCol}>
+                    <Text style={styles.simuladorMontoLabel}>Días ganados</Text>
+                    <Text style={[styles.simuladorMonto, { color: "#F59E0B" }]}>
+                      ~{diasAcelerados} d
+                    </Text>
+                  </View>
+                </>
+              ) : null}
+            </View>
+
+            <Text style={styles.simuladorExplicacion}>
+              {primeraMeta
+                ? `Redirigiendo este capital ($${montoMensualLiberado.toLocaleString("es-CO")}/mes) al ahorro, adelantarías aproximadamente ${diasAcelerados} días el cumplimiento de tu meta "${primeraMeta.nombre}".`
+                : `Optimizando este porcentaje podrías acumular $${montoAnualLiberado.toLocaleString("es-CO")} al año para consolidar tu primer fondo de ahorro.`}
+            </Text>
           </View>
 
           {/* Módulo de Descarga Formal de Informes */}
@@ -800,5 +880,86 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 12,
+  },
+  simuladorCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  simuladorTitulo: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  simuladorDesc: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  simuladorChipsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  simuladorChip: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  simuladorChipActivo: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  simuladorChipTexto: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  simuladorChipTextoActivo: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  simuladorResultadosRow: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  simuladorCol: {
+    flex: 1,
+    alignItems: "center",
+  },
+  simuladorMontoLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    marginBottom: 2,
+  },
+  simuladorMonto: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  simuladorDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.cardBorder,
+  },
+  simuladorExplicacion: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontStyle: "italic",
   },
 });

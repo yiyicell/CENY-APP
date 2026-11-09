@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   Alert,
+  ScrollView,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -33,10 +34,12 @@ const PALABRAS_HORMIGA = [
 ];
 
 const SUGERENCIAS_RAPIDAS = [
-  { nombre: "Almuerzo", monto: "15000", catNombre: "Alimentación" },
-  { nombre: "Transporte", monto: "3200", catNombre: "Transporte" },
-  { nombre: "Café / Snack", monto: "5000", catNombre: "Ocio" },
-  { nombre: "Supermercado", monto: "80000", catNombre: "Alimentación" },
+  { nombre: "Almuerzo corriente", monto: "16000", catNombre: "Alimentación", icono: "🍽️" },
+  { nombre: "Pasaje bus / transporte", monto: "3200", catNombre: "Transporte", icono: "🚌" },
+  { nombre: "Tinto / Café", monto: "2500", catNombre: "Ocio", icono: "☕" },
+  { nombre: "Snack / Mecato", monto: "4500", catNombre: "Ocio", icono: "🍪" },
+  { nombre: "Supermercado", monto: "60000", catNombre: "Alimentación", icono: "🛒" },
+  { nombre: "Farmacia / Medicinas", monto: "25000", catNombre: "Salud", icono: "💊" },
 ];
 
 export default function NuevoGastoScreen() {
@@ -186,19 +189,28 @@ export default function NuevoGastoScreen() {
         Registra tu compra para evaluar su impacto en tu presupuesto 50/30/20 y tus metas.
       </Text>
 
-      {/* Sugerencias Rápidas */}
-      <Text style={styles.label}>SUGERENCIAS FRECUENTES</Text>
-      <View style={styles.sugerenciasRow}>
+      {/* Botones de Gasto Rápido (1 Toque) */}
+      <Text style={styles.label}>BOTONES DE GASTO RÁPIDO (1 TOQUE)</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.sugerenciasScroll}
+        contentContainerStyle={styles.sugerenciasContent}
+      >
         {SUGERENCIAS_RAPIDAS.map((sug) => (
           <TouchableOpacity
             key={sug.nombre}
             onPress={() => aplicarSugerencia(sug)}
             style={styles.chipSugerencia}
           >
-            <Text style={styles.chipTexto}>{sug.nombre}</Text>
+            <Text style={styles.chipIcono}>{sug.icono}</Text>
+            <View>
+              <Text style={styles.chipTexto}>{sug.nombre}</Text>
+              <Text style={styles.chipMonto}>${Number(sug.monto).toLocaleString("es-CO")}</Text>
+            </View>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       <Text style={styles.label}>MONTO (COP)</Text>
       <TextInput
@@ -301,24 +313,37 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontWeight: "600",
   },
-  sugerenciasRow: {
+  sugerenciasScroll: {
+    marginBottom: 14,
+  },
+  sugerenciasContent: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
-    marginBottom: 10,
+    paddingVertical: 2,
   },
   chipSugerencia: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    gap: 8,
+  },
+  chipIcono: {
+    fontSize: 18,
   },
   chipTexto: {
     color: colors.textPrimary,
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
+  },
+  chipMonto: {
+    color: colors.success,
+    fontSize: 11,
+    fontWeight: "700",
   },
   input: {
     borderWidth: 1,
