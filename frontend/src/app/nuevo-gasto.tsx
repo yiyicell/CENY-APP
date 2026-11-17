@@ -9,7 +9,6 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
@@ -223,29 +222,43 @@ export default function NuevoGastoScreen() {
       />
 
       <Text style={styles.label}>CATEGORÍA</Text>
-      <View style={styles.pickerWrapper}>
-        <Picker
-          selectedValue={categoriaId}
-          onValueChange={setCategoriaId}
-          style={{ color: colors.textPrimary }}
-          dropdownIconColor={colors.textPrimary}
-        >
-          {categorias.map((cat) => {
-            const etiquetaPrioridad =
-              cat.prioridad === "alta"
-                ? " (Necesidad - 50%)"
-                : cat.prioridad === "baja"
-                ? " (Deseo - 30%)"
-                : " (Secundario)";
-            return (
-              <Picker.Item
-                key={cat.id}
-                label={`${cat.nombre}${etiquetaPrioridad}`}
-                value={cat.id}
-              />
-            );
-          })}
-        </Picker>
+      <View style={styles.categoriasGrid}>
+        {categorias.map((cat) => {
+          const seleccionada = cat.id === categoriaId;
+          const etiquetaPrioridad =
+            cat.prioridad === "alta"
+              ? "Necesidad · 50%"
+              : cat.prioridad === "baja"
+              ? "Deseo · 30%"
+              : "Secundario · 30%";
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              onPress={() => setCategoriaId(cat.id)}
+              style={[
+                styles.categoriaChip,
+                seleccionada && styles.categoriaChipActiva,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoriaNombre,
+                  seleccionada && styles.categoriaNombreActivo,
+                ]}
+              >
+                {cat.nombre}
+              </Text>
+              <Text
+                style={[
+                  styles.categoriaPrio,
+                  seleccionada && styles.categoriaPrioActiva,
+                ]}
+              >
+                {etiquetaPrioridad}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <Text style={styles.label}>FECHA DEL GASTO (DD/MM/AAAA)</Text>
@@ -272,7 +285,7 @@ export default function NuevoGastoScreen() {
       {esPotencialHormiga && (
         <View style={styles.avisoHormiga}>
           <Text style={styles.avisoHormigaTexto}>
-            🐜 <Text style={{ fontWeight: "700" }}>Aviso predictivo:</Text> Este gasto parece ser un micro-gasto (gasto hormiga). Reducir estas compras frecuentes te permitirá destinar más dinero a tus metas.
+            <Text style={{ fontWeight: "700" }}>Aviso predictivo:</Text> Este gasto parece ser un micro-gasto (gasto hormiga). Reducir estas compras frecuentes te permitirá destinar más dinero a tus metas.
           </Text>
         </View>
       )}
@@ -355,13 +368,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 16,
   },
-  pickerWrapper: {
+  categoriasGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  categoriaChip: {
+    width: "48%",
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.inputBorder,
-    backgroundColor: colors.card,
     borderRadius: 12,
-    marginBottom: 12,
-    overflow: "hidden",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  categoriaChipActiva: {
+    backgroundColor: "rgba(20, 184, 166, 0.14)",
+    borderColor: colors.success,
+  },
+  categoriaNombre: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  categoriaNombreActivo: {
+    color: colors.success,
+  },
+  categoriaPrio: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  categoriaPrioActiva: {
+    color: colors.textPrimary,
   },
   avisoHormiga: {
     backgroundColor: "rgba(245, 158, 11, 0.12)",
