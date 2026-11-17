@@ -605,19 +605,19 @@ export default function ReportesScreen() {
             </Text>
           </View>
 
-          {/* Módulo de Descarga Formal de Informes */}
+          {/* Módulo de Descarga de Reportes */}
           <View style={styles.exportarCard}>
-            <Text style={styles.exportarTitulo}>Descarga de Informes Formales</Text>
+            <Text style={styles.exportarTitulo}>Exportar tus reportes</Text>
             <Text style={styles.exportarDesc}>
-              Genera documentos ejecutivos multi-hoja en formato Microsoft Excel (.xlsx) o informes maquetados en PDF con tablas consolidadas de auditoría patrimonial.
+              Descarga un resumen completo de tus finanzas en Excel o PDF para guardarlo, imprimirlo o revisarlo con calma.
             </Text>
 
             <View style={styles.exportarFeaturesList}>
               <Text style={styles.exportarFeatureItem}>
-                • Hoja de cálculo Excel (.xlsx): 4 pestañas (Resumen, Gastos, Ingresos, Metas).
+                • Excel (.xlsx): incluye hojas separadas con tu resumen, gastos, ingresos y metas.
               </Text>
               <Text style={styles.exportarFeatureItem}>
-                • Documento PDF: Tablas de balance, auditoría de fugas y regla 50/30/20.
+                • PDF: documento listo para leer o compartir con tu balance y detalle de gastos.
               </Text>
             </View>
 
