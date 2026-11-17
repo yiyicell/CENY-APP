@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from uuid import UUID
 from datetime import date, datetime
 from decimal import Decimal
@@ -12,12 +12,16 @@ class AporteBase(BaseModel):
 
 
 class AporteCreate(AporteBase):
-    pass
+    origen: Optional[Literal["saldo", "externo"]] = Field(
+        default="saldo",
+        description="Origen del capital: 'saldo' (descuenta de ingresos del mes) o 'externo' (ahorro previo/dinero aparte)",
+    )
 
 
 class AporteResponse(AporteBase):
     id: UUID
     meta_id: UUID
+    origen: Optional[str] = "saldo"
     creado_en: Optional[datetime] = None
 
     class Config:
@@ -67,6 +71,8 @@ class MetaResponse(MetaBase):
     estado: EstadoMeta
     creado_en: Optional[datetime] = None
     total_ahorrado: Decimal = Decimal("0.00")
+    ahorro_desde_saldo: Decimal = Decimal("0.00")
+    ahorro_externo: Decimal = Decimal("0.00")
     progreso_porcentaje: float = 0.0
     cuota_sugerida: Optional[Decimal] = None
     periodos_restantes: Optional[int] = None

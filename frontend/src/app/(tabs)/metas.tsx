@@ -12,11 +12,13 @@ import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { obtenerMetasAPI } from "@/services/api";
 import { formatearFechaCO } from "@/utils/date";
+import { obtenerOrigenesAportesLocal } from "@/utils/aportesOrigen";
 
 type Aporte = {
   id: string;
   valor: number;
   fecha_aporte: string;
+  origen?: "saldo" | "externo";
 };
 
 type Meta = {
@@ -54,6 +56,8 @@ export default function MetasScreen() {
 
   async function cargar() {
     setCargando(true);
+    const origenesLocal = await obtenerOrigenesAportesLocal();
+
     try {
       // 1. Cargar a través de la API REST de FastAPI (con métricas algorítmicas de seguimiento)
       const metasAPI = await obtenerMetasAPI();
@@ -62,6 +66,12 @@ export default function MetasScreen() {
           metasAPI.map((m: any) => ({
             ...m,
             aportado: Number(m.total_ahorrado ?? 0),
+            aportes: Array.isArray(m.aportes)
+              ? m.aportes.map((a: any) => ({
+                  ...a,
+                  origen: a.origen || origenesLocal[String(a.id)] || "saldo",
+                }))
+              : [],
           }))
         );
         setCargando(false);
@@ -91,6 +101,7 @@ export default function MetasScreen() {
         id: a.id,
         valor: Number(a.valor),
         fecha_aporte: a.fecha_aporte,
+        origen: origenesLocal[String(a.id)] || "saldo",
       });
     });
 
@@ -315,6 +326,7 @@ export default function MetasScreen() {
                         <View key={a.id} style={styles.aporteItemRow}>
                           <Text style={styles.aporteItemFecha}>
                             {formatearFechaCO(a.fecha_aporte)}
+                            {a.origen === "externo" ? " · Ahorro previo" : ""}
                           </Text>
                           <Text style={styles.aporteItemMonto}>
                             + ${Number(a.valor).toLocaleString("es-CO")}

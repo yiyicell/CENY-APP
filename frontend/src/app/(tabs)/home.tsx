@@ -11,6 +11,7 @@ import { Link, useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
 import { obtenerMetasAPI } from "@/services/api";
+import { obtenerOrigenesAportesLocal } from "@/utils/aportesOrigen";
 import { GastoCard } from "@/components/GastoCard";
 import { IngresoCard } from "@/components/IngresoCard";
 
@@ -46,6 +47,7 @@ export default function HomeScreen() {
   const [totalGastos, setTotalGastos] = useState(0);
   const [metasActivas, setMetasActivas] = useState(0);
   const [totalAhorrado, setTotalAhorrado] = useState(0);
+  const [ahorroDesdeSaldo, setAhorroDesdeSaldo] = useState(0);
   const [refrescando, setRefrescando] = useState(false);
   const [tabRecientes, setTabRecientes] = useState<"gastos" | "ingresos">("gastos");
 
@@ -90,8 +92,10 @@ export default function HomeScreen() {
       setTotalGastos(gasTotal);
     }
 
-    // Metas y Aportes (priorizando FastAPI Memento-sync con fallback a Supabase)
+    // Metas y Aportes (priorizando FastAPI con fallback a Supabase + AsyncStorage)
     let metasSincronizadas = false;
+    const origenesLocal = await obtenerOrigenesAportesLocal();
+
     try {
       const metasAPI = await obtenerMetasAPI();
       if (Array.isArray(metasAPI)) {
@@ -102,8 +106,22 @@ export default function HomeScreen() {
           (acc: number, m: any) => acc + Number(m.total_ahorrado ?? 0),
           0
         );
+        const totDesdeSaldo = metasAPI.reduce((acc: number, m: any) => {
+          if (Array.isArray(m.aportes)) {
+            return (
+              acc +
+              m.aportes.reduce((sub: number, ap: any) => {
+                const orig = ap.origen || origenesLocal[String(ap.id)] || "saldo";
+                return orig === "externo" ? sub : sub + Number(ap.valor ?? 0);
+              }, 0)
+            );
+          }
+          return acc + Number(m.ahorro_desde_saldo ?? m.total_ahorrado ?? 0);
+        }, 0);
+
         setMetasActivas(activas);
         setTotalAhorrado(totAhorro);
+        setAhorroDesdeSaldo(totDesdeSaldo);
         metasSincronizadas = true;
       }
     } catch {
@@ -123,10 +141,15 @@ export default function HomeScreen() {
 
       const { data: aportes } = await supabase
         .from("aportes")
-        .select("valor");
+        .select("id, valor");
       if (aportes) {
         const totAhorro = aportes.reduce((acc, a) => acc + Number(a.valor), 0);
+        const totDesdeSaldo = aportes.reduce((acc, a) => {
+          const orig = origenesLocal[String(a.id)] || "saldo";
+          return orig === "externo" ? acc : acc + Number(a.valor);
+        }, 0);
         setTotalAhorrado(totAhorro);
+        setAhorroDesdeSaldo(totDesdeSaldo);
       }
     }
 
@@ -138,8 +161,8 @@ export default function HomeScreen() {
     cargarDatos();
   }
 
-  // Saldo libre real disponible para gastar (no menor a 0)
-  const saldoCalculado = totalIngresos - totalGastos - totalAhorrado;
+  // Saldo libre real disponible para gastar (solo descuenta aportes hechos desde el saldo)
+  const saldoCalculado = totalIngresos - totalGastos - ahorroDesdeSaldo;
   const saldoLibre = Math.max(0, saldoCalculado);
   const porcentajeGastado = totalIngresos > 0 ? Math.round((totalGastos / totalIngresos) * 100) : 0;
 
@@ -234,7 +257,7 @@ export default function HomeScreen() {
             >
               {saldoCalculado < 0
                 ? "Sin saldo libre"
-                : totalAhorrado > 0
+                : ahorroDesdeSaldo > 0
                 ? "Ahorro protegido"
                 : "Disponible"}
             </Text>
@@ -270,9 +293,9 @@ export default function HomeScreen() {
           <View style={styles.desgloseDivider} />
 
           <View style={styles.desgloseCol}>
-            <Text style={styles.desgloseLabel}>En Metas</Text>
+            <Text style={styles.desgloseLabel}>Apartado</Text>
             <Text style={[styles.desgloseText, { color: "#818CF8" }]}>
-              -${totalAhorrado.toLocaleString("es-CO")}
+              -${ahorroDesdeSaldo.toLocaleString("es-CO")}
             </Text>
           </View>
         </View>

@@ -12,17 +12,18 @@ _STORE_PATH = os.path.abspath(
 
 def _cargar_store_local() -> Dict[str, Any]:
     if not os.path.exists(_STORE_PATH):
-        return {"mementos": {}, "reverted_aportes": {}}
+        return {"mementos": {}, "reverted_aportes": {}, "aportes_origen": {}}
     try:
         with open(_STORE_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
             if not isinstance(data, dict):
-                return {"mementos": {}, "reverted_aportes": {}}
+                return {"mementos": {}, "reverted_aportes": {}, "aportes_origen": {}}
             data.setdefault("mementos", {})
             data.setdefault("reverted_aportes", {})
+            data.setdefault("aportes_origen", {})
             return data
     except Exception:
-        return {"mementos": {}, "reverted_aportes": {}}
+        return {"mementos": {}, "reverted_aportes": {}, "aportes_origen": {}}
 
 
 def _guardar_store_local(store: Dict[str, Any]) -> None:
@@ -77,13 +78,35 @@ def listar_aportes(client: Client, jwt: str, meta_id: Optional[str] = None):
     return respuesta.data
 
 
+def obtener_origenes_aportes_local() -> Dict[str, str]:
+    store = _cargar_store_local()
+    return dict(store.get("aportes_origen", {}))
+
+
+def guardar_origen_aporte_local(aporte_id: str, origen: str) -> None:
+    store = _cargar_store_local()
+    origenes = store.setdefault("aportes_origen", {})
+    origenes[str(aporte_id)] = origen if origen in ("saldo", "externo") else "saldo"
+    _guardar_store_local(store)
+
+
 def crear_aporte(client: Client, jwt: str, datos: dict):
     client.postgrest.auth(jwt)
-    if "id" not in datos or not datos["id"]:
-        datos["id"] = str(uuid.uuid4())
+    datos_insert = dict(datos)
+    origen = str(datos_insert.pop("origen", "saldo") or "saldo")
+    if origen not in ("saldo", "externo"):
+        origen = "saldo"
 
-    respuesta = client.table("aportes").insert(datos).execute()
-    return respuesta.data[0] if respuesta.data else None
+    if "id" not in datos_insert or not datos_insert["id"]:
+        datos_insert["id"] = str(uuid.uuid4())
+
+    respuesta = client.table("aportes").insert(datos_insert).execute()
+    if not respuesta.data:
+        return None
+    aporte_creado = dict(respuesta.data[0])
+    guardar_origen_aporte_local(str(aporte_creado.get("id")), origen)
+    aporte_creado["origen"] = origen
+    return aporte_creado
 
 
 def eliminar_aporte(client: Client, jwt: str, aporte_id: str) -> bool:

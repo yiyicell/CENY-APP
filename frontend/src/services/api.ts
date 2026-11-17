@@ -1,6 +1,7 @@
 import { supabase } from "@/constants/supabase";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import { guardarOrigenAporteLocal, OrigenAporte } from "@/utils/aportesOrigen";
 
 function getBaseApiUrl(): string {
   // Si está definida una IP o URL específica en el entorno, usarla
@@ -177,18 +178,27 @@ export async function registrarAporteAPI(
   aporte: {
     valor: number;
     fecha_aporte: string;
+    origen?: OrigenAporte;
   }
 ) {
+  const origenElegido: OrigenAporte = aporte.origen || "saldo";
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_URL}/metas/${metaId}/aportes`, {
     method: "POST",
     headers,
-    body: JSON.stringify(aporte),
+    body: JSON.stringify({
+      valor: aporte.valor,
+      fecha_aporte: aporte.fecha_aporte,
+      origen: origenElegido,
+    }),
   });
 
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.mensaje || "Error al registrar el aporte");
+  }
+  if (data?.id) {
+    await guardarOrigenAporteLocal(String(data.id), origenElegido);
   }
   return data;
 }

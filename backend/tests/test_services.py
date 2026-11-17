@@ -134,6 +134,24 @@ class TestGestionMetas(unittest.TestCase):
         self.assertEqual(res["estado_seguimiento"], "por_vencer")
         self.assertIn("Plazo crítico", res["mensaje_seguimiento"])
 
+    def test_calculo_origen_saldo_vs_externo(self):
+        fecha_obj = date.today() + timedelta(days=30)
+        meta = {
+            "id": "44444444-4444-4444-4444-444444444444",
+            "valor_objetivo": 400000.0,
+            "frecuencia_ahorro": "mensual",
+            "fecha_objetivo": fecha_obj.isoformat(),
+            "estado": "por_cumplir",
+        }
+        aportes = [
+            {"id": "a1", "meta_id": meta["id"], "valor": 50000.0, "origen": "saldo"},
+            {"id": "a2", "meta_id": meta["id"], "valor": 250000.0, "origen": "externo"},
+        ]
+        res = calcular_metricas_meta(meta, aportes)
+        self.assertEqual(res["total_ahorrado"], 300000.0)
+        self.assertEqual(res["ahorro_desde_saldo"], 50000.0)
+        self.assertEqual(res["ahorro_externo"], 250000.0)
+
 class TestEndpointsFastAPI(unittest.TestCase):
 
     def setUp(self):

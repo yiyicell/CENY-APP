@@ -43,8 +43,26 @@ def calcular_metricas_meta(
     mementos: Optional[List[dict]] = None,
 ) -> dict:
     meta_id = str(meta.get("id"))
-    aportes_meta = _filtrar_aportes_activos(meta_id, aportes)
-    total_ahorrado = round(sum(float(a.get("valor", 0)) for a in aportes_meta), 2)
+    aportes_meta_raw = _filtrar_aportes_activos(meta_id, aportes)
+    origenes_local = metas_repo.obtener_origenes_aportes_local()
+
+    aportes_meta: List[dict] = []
+    ahorro_desde_saldo = 0.0
+    ahorro_externo = 0.0
+    for a in aportes_meta_raw:
+        ap_copy = dict(a)
+        origen = str(ap_copy.get("origen") or origenes_local.get(str(ap_copy.get("id")), "saldo"))
+        if origen not in ("saldo", "externo"):
+            origen = "saldo"
+        ap_copy["origen"] = origen
+        val = float(ap_copy.get("valor", 0))
+        if origen == "externo":
+            ahorro_externo = round(ahorro_externo + val, 2)
+        else:
+            ahorro_desde_saldo = round(ahorro_desde_saldo + val, 2)
+        aportes_meta.append(ap_copy)
+
+    total_ahorrado = round(ahorro_desde_saldo + ahorro_externo, 2)
     valor_objetivo = float(meta.get("valor_objetivo", 0))
 
     progreso = 0.0
@@ -111,6 +129,8 @@ def calcular_metricas_meta(
 
     meta_con_metricas = dict(meta)
     meta_con_metricas["total_ahorrado"] = total_ahorrado
+    meta_con_metricas["ahorro_desde_saldo"] = ahorro_desde_saldo
+    meta_con_metricas["ahorro_externo"] = ahorro_externo
     meta_con_metricas["progreso_porcentaje"] = progreso
     meta_con_metricas["cuota_sugerida"] = cuota_sugerida
     meta_con_metricas["periodos_restantes"] = periodos_restantes
@@ -239,9 +259,14 @@ def registrar_aporte(client, jwt: str, meta_id: str, datos: dict) -> dict:
     )
 
     monto = float(datos.get("valor", 0))
+    origen = str(datos.get("origen") or "saldo")
+    if origen not in ("saldo", "externo"):
+        origen = "saldo"
+    nota_origen = "ahorro externo" if origen == "externo" else "saldo disponible"
+
     # 1. Patrón Memento: guardar estado previo ANTES de aplicar abonarMeta()
     memento_previo = originator.guardarEstado(
-        nota=f"Previo a abono de ${monto:,.0f}",
+        nota=f"Previo a abono de ${monto:,.0f} ({nota_origen})",
         aportes_ids=[str(a.get("id")) for a in aportes_activos],
     )
     # 2. Aplicar lógica de negocio en Originator (valida > 0 y estado != CANCELADA)
@@ -254,6 +279,7 @@ def registrar_aporte(client, jwt: str, meta_id: str, datos: dict) -> dict:
     # 4. Persistir el nuevo aporte en base de datos
     datos_insert = dict(datos)
     datos_insert["meta_id"] = meta_id
+    datos_insert["origen"] = origen
     if "fecha_aporte" in datos_insert and isinstance(datos_insert["fecha_aporte"], date):
         datos_insert["fecha_aporte"] = datos_insert["fecha_aporte"].isoformat()
     elif "fecha_aporte" in datos_insert:
