@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 backend/.venv/
+backend/data/*.json
 .venv/
 env/
 venv/

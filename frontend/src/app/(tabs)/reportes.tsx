@@ -12,7 +12,7 @@ import {
 import { useFocusEffect } from "expo-router";
 import { colors } from "@/constants/theme";
 import { supabase } from "@/constants/supabase";
-import { obtenerAnalisisAPI } from "@/services/api";
+import { obtenerAnalisisAPI, obtenerMetasAPI } from "@/services/api";
 import { GraficasFinancieras, CategoriaDesglose } from "@/components/GraficasFinancieras";
 import {
   DatosExportacion,
@@ -119,24 +119,42 @@ export default function ReportesScreen() {
     listaDesglose.sort((a, b) => b.total - a.total);
     setCategoriasDesglose(listaDesglose);
 
-    // Obtener metas
-    const { data: metas } = await supabase
-      .from("metas")
-      .select("nombre, valor_objetivo, fecha_objetivo, estado, id");
+    // Obtener metas (priorizando FastAPI Memento-sync con fallback a Supabase)
+    let metasFormateadas: any[] = [];
+    try {
+      const metasAPI = await obtenerMetasAPI();
+      if (Array.isArray(metasAPI)) {
+        metasFormateadas = metasAPI.map((m: any) => ({
+          nombre: m.nombre,
+          valor_objetivo: Number(m.valor_objetivo),
+          aportado: Number(m.total_ahorrado ?? 0),
+          fecha_objetivo: m.fecha_objetivo,
+          estado: m.estado,
+        }));
+      }
+    } catch {
+      // Fallback a Supabase
+    }
 
-    const { data: aportes } = await supabase.from("aportes").select("meta_id, valor");
-    const totalesAportes: Record<string, number> = {};
-    (aportes || []).forEach((a) => {
-      totalesAportes[a.meta_id] = (totalesAportes[a.meta_id] || 0) + Number(a.valor);
-    });
+    if (metasFormateadas.length === 0) {
+      const { data: metas } = await supabase
+        .from("metas")
+        .select("nombre, valor_objetivo, fecha_objetivo, estado, id");
 
-    const metasFormateadas = (metas || []).map((m) => ({
-      nombre: m.nombre,
-      valor_objetivo: Number(m.valor_objetivo),
-      aportado: totalesAportes[m.id] || 0,
-      fecha_objetivo: m.fecha_objetivo,
-      estado: m.estado,
-    }));
+      const { data: aportes } = await supabase.from("aportes").select("meta_id, valor");
+      const totalesAportes: Record<string, number> = {};
+      (aportes || []).forEach((a) => {
+        totalesAportes[a.meta_id] = (totalesAportes[a.meta_id] || 0) + Number(a.valor);
+      });
+
+      metasFormateadas = (metas || []).map((m) => ({
+        nombre: m.nombre,
+        valor_objetivo: Number(m.valor_objetivo),
+        aportado: totalesAportes[m.id] || 0,
+        fecha_objetivo: m.fecha_objetivo,
+        estado: m.estado,
+      }));
+    }
 
     // Cargar análisis algorítmico y predictivo desde FastAPI
     let analisisBackend: any = null;

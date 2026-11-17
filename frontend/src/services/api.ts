@@ -192,3 +192,91 @@ export async function registrarAporteAPI(
   }
   return data;
 }
+
+export interface MementoDTO {
+  id: string;
+  meta_id: string;
+  index: number;
+  monto_actual: number;
+  estado: "EN_PROGRESO" | "COMPLETADA" | "CANCELADA";
+  fecha_registro: string;
+  nota?: string | null;
+}
+
+export async function obtenerMementosMetaAPI(metaId: string): Promise<MementoDTO[]> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/metas/${metaId}/mementos`, {
+    method: "GET",
+    headers,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "Error al obtener el historial Memento de la meta");
+  }
+  return data;
+}
+
+export async function guardarSnapshotMetaAPI(
+  metaId: string,
+  nota?: string
+): Promise<MementoDTO> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/metas/${metaId}/mementos`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ nota: nota || "Punto de control manual" }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "Error al guardar el snapshot de la meta");
+  }
+  return data;
+}
+
+export async function deshacerEstadoMetaAPI(metaId: string) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/metas/${metaId}/deshacer`, {
+    method: "POST",
+    headers,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "No se pudo deshacer el último cambio");
+  }
+  return data;
+}
+
+export async function restaurarMementoMetaAPI(metaId: string, index: number) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/metas/${metaId}/restaurar/${index}`, {
+    method: "POST",
+    headers,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "Error al restaurar el estado seleccionado");
+  }
+  return data;
+}
+
+export async function cambiarEstadoMetaAPI(
+  metaId: string,
+  estado: "EN_PROGRESO" | "COMPLETADA" | "CANCELADA"
+) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/metas/${metaId}/estado`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ estado }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.mensaje || "Error al actualizar el estado de la meta");
+  }
+  return data;
+}

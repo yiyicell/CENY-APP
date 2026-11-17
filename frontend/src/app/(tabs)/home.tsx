@@ -10,6 +10,7 @@ import {
 import { Link, useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
+import { obtenerMetasAPI } from "@/services/api";
 import { GastoCard } from "@/components/GastoCard";
 import { IngresoCard } from "@/components/IngresoCard";
 
@@ -89,22 +90,44 @@ export default function HomeScreen() {
       setTotalGastos(gasTotal);
     }
 
-    // Metas
-    const { data: metas } = await supabase
-      .from("metas")
-      .select("id, estado");
-    if (metas) {
-      const activas = metas.filter((m) => m.estado !== "cumplido").length;
-      setMetasActivas(activas);
+    // Metas y Aportes (priorizando FastAPI Memento-sync con fallback a Supabase)
+    let metasSincronizadas = false;
+    try {
+      const metasAPI = await obtenerMetasAPI();
+      if (Array.isArray(metasAPI)) {
+        const activas = metasAPI.filter(
+          (m: any) => m.estado !== "cumplido" && m.estado !== "no_cumplido"
+        ).length;
+        const totAhorro = metasAPI.reduce(
+          (acc: number, m: any) => acc + Number(m.total_ahorrado ?? 0),
+          0
+        );
+        setMetasActivas(activas);
+        setTotalAhorrado(totAhorro);
+        metasSincronizadas = true;
+      }
+    } catch {
+      // Fallback directo a Supabase
     }
 
-    // Aportes totales
-    const { data: aportes } = await supabase
-      .from("aportes")
-      .select("valor");
-    if (aportes) {
-      const totAhorro = aportes.reduce((acc, a) => acc + Number(a.valor), 0);
-      setTotalAhorrado(totAhorro);
+    if (!metasSincronizadas) {
+      const { data: metas } = await supabase
+        .from("metas")
+        .select("id, estado");
+      if (metas) {
+        const activas = metas.filter(
+          (m) => m.estado !== "cumplido" && m.estado !== "no_cumplido"
+        ).length;
+        setMetasActivas(activas);
+      }
+
+      const { data: aportes } = await supabase
+        .from("aportes")
+        .select("valor");
+      if (aportes) {
+        const totAhorro = aportes.reduce((acc, a) => acc + Number(a.valor), 0);
+        setTotalAhorrado(totAhorro);
+      }
     }
 
     setRefrescando(false);

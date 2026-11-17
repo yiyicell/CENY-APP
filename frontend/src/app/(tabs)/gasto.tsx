@@ -11,6 +11,7 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
+import { obtenerMetasAPI } from "@/services/api";
 import { GastoCard } from "@/components/GastoCard";
 import { IngresoCard } from "@/components/IngresoCard";
 import { AporteCard } from "@/components/AporteCard";
@@ -97,13 +98,43 @@ export default function MovimientosScreen() {
       .order("fecha_ingreso", { ascending: false });
     if (dataIngresos) setIngresos(dataIngresos as Ingreso[]);
 
-    // 3. Cargar Aportes a Metas
-    const { data: dataAportes } = await supabase
-      .from("aportes")
-      .select("id, valor, fecha_aporte, meta_id, metas(nombre)")
-      .gte("fecha_aporte", fechaDesde)
-      .order("fecha_aporte", { ascending: false });
-    if (dataAportes) setAportes(dataAportes as unknown as Aporte[]);
+    // 3. Cargar Aportes a Metas (priorizando FastAPI Memento-sync con fallback a Supabase)
+    let aportesCargados = false;
+    try {
+      const metasAPI = await obtenerMetasAPI();
+      if (Array.isArray(metasAPI)) {
+        const listaAportes: Aporte[] = [];
+        metasAPI.forEach((m: any) => {
+          (m.aportes || []).forEach((ap: any) => {
+            if (String(ap.fecha_aporte) >= fechaDesde) {
+              listaAportes.push({
+                id: ap.id,
+                valor: Number(ap.valor),
+                fecha_aporte: ap.fecha_aporte,
+                meta_id: ap.meta_id || m.id,
+                metas: { nombre: m.nombre },
+              });
+            }
+          });
+        });
+        listaAportes.sort((a, b) =>
+          String(b.fecha_aporte).localeCompare(String(a.fecha_aporte))
+        );
+        setAportes(listaAportes);
+        aportesCargados = true;
+      }
+    } catch {
+      // Fallback a Supabase
+    }
+
+    if (!aportesCargados) {
+      const { data: dataAportes } = await supabase
+        .from("aportes")
+        .select("id, valor, fecha_aporte, meta_id, metas(nombre)")
+        .gte("fecha_aporte", fechaDesde)
+        .order("fecha_aporte", { ascending: false });
+      if (dataAportes) setAportes(dataAportes as unknown as Aporte[]);
+    }
 
     setCargando(false);
     setRefrescando(false);
