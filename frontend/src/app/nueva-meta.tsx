@@ -157,6 +157,11 @@ export default function NuevaMetaScreen() {
         keyboardType="numeric"
         style={styles.input}
       />
+      {Number(objetivo) > 0 && (
+        <Text style={styles.montoPreview}>
+          Valor: $ {Number(objetivo).toLocaleString("es-CO")} COP
+        </Text>
+      )}
 
       <Text style={styles.label}>FRECUENCIA DE AHORRO</Text>
       <View style={styles.frecuenciaRow}>
@@ -292,6 +297,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     fontSize: 16,
+  },
+  montoPreview: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: -6,
+    marginBottom: 10,
+    marginLeft: 4,
   },
   frecuenciaRow: {
     flexDirection: "row",

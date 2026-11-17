@@ -203,6 +203,31 @@ export async function registrarAporteAPI(
   return data;
 }
 
+export async function actualizarOrigenAporteAPI(
+  metaId: string,
+  aporteId: string,
+  origen: OrigenAporte
+) {
+  await guardarOrigenAporteLocal(aporteId, origen);
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(
+      `${API_URL}/metas/${metaId}/aportes/${aporteId}/origen`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ origen }),
+      }
+    );
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch {
+    // Si el backend no está disponible, AsyncStorage ya persistió el cambio localmente
+  }
+  return null;
+}
+
 export interface MementoDTO {
   id: string;
   meta_id: string;

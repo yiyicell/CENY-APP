@@ -18,6 +18,13 @@ class AporteCreate(AporteBase):
     )
 
 
+class AporteOrigenUpdate(BaseModel):
+    origen: Literal["saldo", "externo"] = Field(
+        ...,
+        description="Origen del capital: 'saldo' o 'externo'",
+    )
+
+
 class AporteResponse(AporteBase):
     id: UUID
     meta_id: UUID

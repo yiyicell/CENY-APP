@@ -6,11 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  Alert,
+  Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
 import { colors } from "@/constants/theme";
-import { obtenerMetasAPI } from "@/services/api";
+import { obtenerMetasAPI, actualizarOrigenAporteAPI } from "@/services/api";
 import { formatearFechaCO } from "@/utils/date";
 import { obtenerOrigenesAportesLocal } from "@/utils/aportesOrigen";
 
@@ -125,8 +128,49 @@ export default function MetasScreen() {
     setMetaExpandida((prev) => (prev === id ? null : id));
   }
 
+  function handleEliminarMeta(meta: Meta) {
+    const ejecutarBorrado = async () => {
+      const { error } = await supabase.from("metas").delete().eq("id", meta.id);
+      if (!error) {
+        cargar();
+      } else {
+        if (Platform.OS === "web") {
+          window.alert("No se pudo eliminar la meta: " + error.message);
+        } else {
+          Alert.alert("Error", "No se pudo eliminar la meta.");
+        }
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (
+        window.confirm(
+          `¿Eliminar la meta "${meta.nombre}" y sus aportes registrados?`
+        )
+      ) {
+        ejecutarBorrado();
+      }
+    } else {
+      Alert.alert(
+        "Eliminar meta",
+        `¿Eliminar la meta "${meta.nombre}" y sus aportes registrados?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Eliminar", style: "destructive", onPress: ejecutarBorrado },
+        ]
+      );
+    }
+  }
+
+  async function handleToggleOrigenAporte(metaId: string, aporte: Aporte) {
+    const nuevoOrigen = aporte.origen === "externo" ? "saldo" : "externo";
+    await actualizarOrigenAporteAPI(metaId, aporte.id, nuevoOrigen);
+    await cargar();
+  }
+
   return (
     <View style={styles.container}>
+      <View style={styles.innerContainer}>
       <Text style={styles.title}>Metas y Seguimiento</Text>
       <Text style={styles.subtitulo}>
         Monitorea el avance de tus objetivos de ahorro con seguimiento cronológico
@@ -285,7 +329,20 @@ export default function MetasScreen() {
                     {Math.round(progreso * 100)}% · Límite: {formatearFechaCO(item.fecha_objetivo)}
                   </Text>
 
-                  <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    {/* Botón discreto para eliminar meta */}
+                    <TouchableOpacity
+                      onPress={() => handleEliminarMeta(item)}
+                      style={styles.botonEliminar}
+                      accessibilityLabel="Eliminar meta"
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={15}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+
                     {/* Botón para ver historial normal de aportes */}
                     <TouchableOpacity
                       onPress={() => toggleExpandir(item.id)}
@@ -316,23 +373,54 @@ export default function MetasScreen() {
                 {/* Desglose desplegable de aportes */}
                 {expandida && (
                   <View style={styles.aportesContainer}>
-                    <Text style={styles.aportesTitulo}>Historial de Aportes:</Text>
+                    <View style={styles.aportesHeaderRow}>
+                      <Text style={styles.aportesTitulo}>Historial de Aportes</Text>
+                      {item.aportes && item.aportes.length > 0 && (
+                        <Text style={styles.aportesTip}>
+                          Toca la etiqueta para cambiar origen
+                        </Text>
+                      )}
+                    </View>
                     {!item.aportes || item.aportes.length === 0 ? (
                       <Text style={styles.aporteItemTextoVacio}>
                         Aún no has registrado ningún abono para esta meta.
                       </Text>
                     ) : (
-                      item.aportes.map((a) => (
-                        <View key={a.id} style={styles.aporteItemRow}>
-                          <Text style={styles.aporteItemFecha}>
-                            {formatearFechaCO(a.fecha_aporte)}
-                            {a.origen === "externo" ? " · Ahorro previo" : ""}
-                          </Text>
-                          <Text style={styles.aporteItemMonto}>
-                            + ${Number(a.valor).toLocaleString("es-CO")}
-                          </Text>
-                        </View>
-                      ))
+                      item.aportes.map((a) => {
+                        const esExterno = a.origen === "externo";
+                        return (
+                          <View key={a.id} style={styles.aporteItemRow}>
+                            <View style={styles.aporteLeft}>
+                              <Text style={styles.aporteItemFecha}>
+                                {formatearFechaCO(a.fecha_aporte)}
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => handleToggleOrigenAporte(item.id, a)}
+                                style={[
+                                  styles.origenPill,
+                                  esExterno
+                                    ? styles.origenPillExterno
+                                    : styles.origenPillSaldo,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.origenPillTexto,
+                                    esExterno
+                                      ? styles.origenPillTextoExterno
+                                      : styles.origenPillTextoSaldo,
+                                  ]}
+                                >
+                                  {esExterno ? "Ahorro previo" : "Desde saldo"}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                            <Text style={styles.aporteItemMonto}>
+                              + ${Number(a.valor).toLocaleString("es-CO")}
+                            </Text>
+                          </View>
+                        );
+                      })
                     )}
                   </View>
                 )}
@@ -341,6 +429,7 @@ export default function MetasScreen() {
           }}
         />
       )}
+      </View>
     </View>
   );
 }
@@ -350,7 +439,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     padding: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === "web" ? 32 : 60,
+  },
+  innerContainer: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 920,
+    alignSelf: "center",
   },
   title: {
     color: colors.textPrimary,
@@ -485,6 +580,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 12,
   },
+  botonEliminar: {
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
   botonHistorial: {
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -515,20 +618,60 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
   },
+  aportesHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   aportesTitulo: {
     color: colors.textPrimary,
     fontSize: 12,
     fontWeight: "700",
-    marginBottom: 6,
+  },
+  aportesTip: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontStyle: "italic",
   },
   aporteItemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 4,
+    alignItems: "center",
+    paddingVertical: 5,
+  },
+  aporteLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   aporteItemFecha: {
     color: colors.textSecondary,
     fontSize: 12,
+  },
+  origenPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  origenPillSaldo: {
+    backgroundColor: "rgba(20, 184, 166, 0.12)",
+    borderColor: "rgba(20, 184, 166, 0.35)",
+  },
+  origenPillExterno: {
+    backgroundColor: "rgba(99, 102, 241, 0.14)",
+    borderColor: "rgba(129, 140, 248, 0.45)",
+  },
+  origenPillTexto: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  origenPillTextoSaldo: {
+    color: colors.success,
+  },
+  origenPillTextoExterno: {
+    color: "#A5B4FC",
   },
   aporteItemMonto: {
     color: colors.success,

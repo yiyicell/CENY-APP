@@ -484,3 +484,18 @@ def cambiar_estado_meta(client, jwt: str, meta_id: str, nuevo_estado_str: str) -
     if not detalle:
         raise ValueError("Error al recuperar la meta actualizada")
     return detalle
+
+
+def actualizar_origen_aporte(
+    client, jwt: str, meta_id: str, aporte_id: str, origen: str
+) -> Dict[str, Any]:
+    if origen not in ("saldo", "externo"):
+        raise ValueError("Origen inválido. Debe ser 'saldo' o 'externo'.")
+    meta = metas_repo.obtener_meta_por_id(client, jwt, meta_id)
+    if not meta:
+        raise ValueError(f"No existe una meta con id: {meta_id}")
+    metas_repo.guardar_origen_aporte_local(aporte_id, origen)
+    detalle = obtener_meta_detalle(client, jwt, meta_id)
+    if not detalle:
+        raise ValueError("Error al recuperar la meta actualizada")
+    return detalle

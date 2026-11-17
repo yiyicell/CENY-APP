@@ -194,6 +194,11 @@ export default function NuevoAporteScreen() {
         keyboardType="numeric"
         style={styles.input}
       />
+      {montoNum > 0 && (
+        <Text style={styles.montoPreview}>
+          Valor: $ {montoNum.toLocaleString("es-CO")} COP
+        </Text>
+      )}
 
       {/* Aviso inteligente si supera el saldo libre disponible */}
       {excedeSaldo && saldoLibreActual !== null && (
@@ -332,6 +337,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     fontSize: 16,
+  },
+  montoPreview: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: -6,
+    marginBottom: 10,
+    marginLeft: 4,
   },
   avisoExcesoBox: {
     backgroundColor: "rgba(245, 158, 11, 0.12)",

@@ -6,6 +6,7 @@ from schemas.metas import (
     MetaResponse,
     AporteCreate,
     AporteResponse,
+    AporteOrigenUpdate,
     MementoResponse,
 )
 from typing import List
@@ -43,6 +44,19 @@ def obtener_meta(meta_id: UUID, jwt: str = Depends(obtener_jwt)):
 def agregar_aporte(meta_id: UUID, aporte: AporteCreate, jwt: str = Depends(obtener_jwt)):
     client = get_client()
     return gestion_metas.registrar_aporte(client, jwt, str(meta_id), aporte.model_dump())
+
+
+@router.patch("/metas/{meta_id}/aportes/{aporte_id}/origen", response_model=MetaResponse)
+def actualizar_origen_aporte(
+    meta_id: UUID,
+    aporte_id: UUID,
+    body: AporteOrigenUpdate,
+    jwt: str = Depends(obtener_jwt),
+):
+    client = get_client()
+    return gestion_metas.actualizar_origen_aporte(
+        client, jwt, str(meta_id), str(aporte_id), body.origen
+    )
 
 
 @router.get("/metas/{meta_id}/mementos", response_model=List[MementoResponse])

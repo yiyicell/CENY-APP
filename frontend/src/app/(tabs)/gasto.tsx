@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  Alert,
+  Platform,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
@@ -145,6 +147,41 @@ export default function MovimientosScreen() {
     cargarMovimientos();
   }
 
+  function handleEliminarGasto(gasto: Gasto) {
+    const desc = gasto.descripcion || gasto.categorias?.nombre || "este gasto";
+    const ejecutarBorrado = async () => {
+      const { error } = await supabase.from("gastos").delete().eq("id", gasto.id);
+      if (!error) {
+        cargarMovimientos();
+      } else {
+        if (Platform.OS === "web") {
+          window.alert("No se pudo eliminar el gasto: " + error.message);
+        } else {
+          Alert.alert("Error", "No se pudo eliminar el gasto.");
+        }
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (
+        window.confirm(
+          `¿Eliminar el gasto "${desc}" por $${Number(gasto.valor).toLocaleString("es-CO")}?`
+        )
+      ) {
+        ejecutarBorrado();
+      }
+    } else {
+      Alert.alert(
+        "Eliminar gasto",
+        `¿Eliminar "${desc}" por $${Number(gasto.valor).toLocaleString("es-CO")}?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Eliminar", style: "destructive", onPress: ejecutarBorrado },
+        ]
+      );
+    }
+  }
+
   // Filtrado de listas según búsqueda
   const gastosFiltrados = gastos.filter(
     (g) =>
@@ -167,6 +204,7 @@ export default function MovimientosScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.innerContainer}>
       <Text style={styles.title}>Movimientos Financieros</Text>
       <Text style={styles.subtitulo}>Historial auditado de ingresos, salidas y reservas</Text>
 
@@ -322,7 +360,9 @@ export default function MovimientosScreen() {
               categoria={item.categorias?.nombre ?? "Sin categoría"}
               fecha={item.fecha_gasto}
               valor={item.valor}
+              descripcion={item.descripcion}
               icono={iconosPorCategoria[item.categorias?.nombre ?? ""] ?? "💸"}
+              onDelete={() => handleEliminarGasto(item)}
             />
           )}
           ListEmptyComponent={
@@ -386,6 +426,7 @@ export default function MovimientosScreen() {
           }
         />
       )}
+      </View>
     </View>
   );
 }
@@ -395,7 +436,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     padding: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === "web" ? 32 : 60,
+  },
+  innerContainer: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 920,
+    alignSelf: "center",
   },
   title: {
     color: colors.textPrimary,

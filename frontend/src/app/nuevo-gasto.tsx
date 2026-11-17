@@ -220,6 +220,11 @@ export default function NuevoGastoScreen() {
         keyboardType="numeric"
         style={styles.input}
       />
+      {Number(valor) > 0 && (
+        <Text style={styles.montoPreview}>
+          Valor: $ {Number(valor).toLocaleString("es-CO")} COP
+        </Text>
+      )}
 
       <Text style={styles.label}>CATEGORÍA</Text>
       <View style={styles.categoriasGrid}>
@@ -367,6 +372,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     fontSize: 16,
+  },
+  montoPreview: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: -6,
+    marginBottom: 10,
+    marginLeft: 4,
   },
   categoriasGrid: {
     flexDirection: "row",

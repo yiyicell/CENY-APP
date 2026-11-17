@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { Link, useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/constants/supabase";
@@ -215,6 +216,7 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.scrollContent}
       refreshControl={
         <RefreshControl
           refreshing={refrescando}
@@ -512,8 +514,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  scrollContent: {
+    width: "100%",
+    maxWidth: 920,
+    alignSelf: "center",
     padding: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === "web" ? 32 : 60,
   },
   headerRow: {
     flexDirection: "row",

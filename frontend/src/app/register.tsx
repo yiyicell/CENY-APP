@@ -50,7 +50,9 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Crear cuenta</Text>
+      <View style={styles.card}>
+        <Text style={styles.brand}>CENY APP</Text>
+        <Text style={styles.title}>Crear cuenta</Text>
 
       <Controller
         control={control}
@@ -97,6 +99,8 @@ export default function RegisterScreen() {
             value={value}
             onChangeText={onChange}
             secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={() => handleSubmit(onSubmit)()}
             style={styles.input}
           />
         )}
@@ -125,6 +129,7 @@ export default function RegisterScreen() {
           Inicia sesión
         </Link>
       </View>
+      </View>
     </View>
   );
 }
@@ -135,6 +140,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     justifyContent: "center",
     padding: 24,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
+  },
+  brand: {
+    color: colors.success,
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 2,
+    textAlign: "center",
+    marginBottom: 6,
   },
   title: {
     color: colors.textPrimary,
