@@ -34,7 +34,7 @@ const PALABRAS_HORMIGA = [
 
 const SUGERENCIAS_RAPIDAS = [
   { nombre: "Almuerzo corriente", monto: "16000", catNombre: "Alimentación", icono: "🍽️" },
-  { nombre: "Pasaje bus / transporte", monto: "3200", catNombre: "Transporte", icono: "🚌" },
+  { nombre: "Pasaje SITP / bus", monto: "3550", catNombre: "Transporte", icono: "🚌" },
   { nombre: "Tinto / Café", monto: "2500", catNombre: "Ocio", icono: "☕" },
   { nombre: "Snack / Mecato", monto: "4500", catNombre: "Ocio", icono: "🍪" },
   { nombre: "Supermercado", monto: "60000", catNombre: "Alimentación", icono: "🛒" },
