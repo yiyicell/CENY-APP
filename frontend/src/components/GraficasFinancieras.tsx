@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import Svg, { G, Circle, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import { colors } from "@/constants/theme";
 
 export type CategoriaDesglose = {
@@ -73,41 +73,39 @@ export function GraficasFinancieras({
             {/* SVG Circular Donut */}
             <View style={styles.svgWrapper}>
               <Svg width={chartSize} height={chartSize}>
-                <G rotation="-90" origin={`${center}, ${center}`}>
-                  {/* Círculo base de fondo */}
-                  <Circle
-                    cx={center}
-                    cy={center}
-                    r={radius}
-                    stroke={colors.cardBorder}
-                    strokeWidth={strokeWidth}
-                    fill="transparent"
-                  />
+                {/* Círculo base de fondo */}
+                <Circle
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  stroke={colors.cardBorder}
+                  strokeWidth={strokeWidth}
+                  fill="transparent"
+                />
 
-                  {/* Segmentos de la torta */}
-                  {categoriasDesglose.map((cat, index) => {
-                    const sliceLength = (cat.porcentaje / 100) * circumference;
-                    const strokeOffset = -(cumulativePercent / 100) * circumference;
-                    cumulativePercent += cat.porcentaje;
+                {/* Segmentos de la torta iniciando desde las 12 en punto sin transform-origin */}
+                {categoriasDesglose.map((cat, index) => {
+                  const sliceLength = (cat.porcentaje / 100) * circumference;
+                  const strokeOffset = (0.25 - cumulativePercent / 100) * circumference;
+                  cumulativePercent += cat.porcentaje;
 
-                    const color = cat.color || PALETA_COLORES[index % PALETA_COLORES.length];
+                  const color = cat.color || PALETA_COLORES[index % PALETA_COLORES.length];
 
-                    return (
-                      <Circle
-                        key={cat.nombre}
-                        cx={center}
-                        cy={center}
-                        r={radius}
-                        stroke={color}
-                        strokeWidth={strokeWidth}
-                        strokeDasharray={`${sliceLength} ${circumference}`}
-                        strokeDashoffset={strokeOffset}
-                        fill="transparent"
-                        strokeLinecap="butt"
-                      />
-                    );
-                  })}
-                </G>
+                  return (
+                    <Circle
+                      key={cat.nombre}
+                      cx={center}
+                      cy={center}
+                      r={radius}
+                      stroke={color}
+                      strokeWidth={strokeWidth}
+                      strokeDasharray={`${sliceLength} ${circumference}`}
+                      strokeDashoffset={strokeOffset}
+                      fill="transparent"
+                      strokeLinecap="butt"
+                    />
+                  );
+                })}
 
                 {/* Texto central en el agujero de la torta */}
                 <SvgText
