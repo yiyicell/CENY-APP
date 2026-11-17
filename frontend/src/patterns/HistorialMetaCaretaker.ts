@@ -1,11 +1,4 @@
-import {
-  MementoDTO,
-  obtenerMementosMetaAPI,
-  guardarSnapshotMetaAPI,
-  deshacerEstadoMetaAPI,
-  restaurarMementoMetaAPI,
-  cambiarEstadoMetaAPI,
-} from "@/services/api";
+import { MementoDTO, obtenerMementosMetaAPI } from "@/services/api";
 
 export enum EstadoMeta {
   EN_PROGRESO = "EN_PROGRESO",
@@ -14,7 +7,7 @@ export enum EstadoMeta {
 }
 
 /**
- * «Memento» (Representación cliente)
+ * «Memento» (Modelo interno del historial de estados en cliente)
  */
 export class MetaAhorroMemento {
   private readonly montoActual: number;
@@ -63,15 +56,15 @@ export class MetaAhorroMemento {
       (dto.estado as EstadoMeta) || EstadoMeta.EN_PROGRESO,
       new Date(dto.fecha_registro),
       dto.id,
-      dto.nota || "Snapshot de estado"
+      dto.nota || "Registro de estado"
     );
   }
 }
 
 /**
- * «Caretaker Controller» (HistorialMetaCaretaker)
- * Coordina desde la aplicación cliente el almacenamiento, consulta y restauración
- * de Mementos comunicándose con el módulo Originator en FastAPI.
+ * «Caretaker» (HistorialMetaCaretaker)
+ * Mantiene internamente la trazabilidad de estados de una meta de ahorro
+ * sin exponer operaciones destructivas en la interfaz del usuario.
  */
 export class HistorialMetaCaretaker {
   private historial: MetaAhorroMemento[] = [];
@@ -92,6 +85,14 @@ export class HistorialMetaCaretaker {
     return this.historial[index];
   }
 
+  public deshacer(): MetaAhorroMemento {
+    const ultimo = this.historial.pop();
+    if (!ultimo) {
+      throw new Error("No hay estados previos en el historial.");
+    }
+    return ultimo;
+  }
+
   public listarHistorial(): MetaAhorroMemento[] {
     return [...this.historial];
   }
@@ -100,48 +101,5 @@ export class HistorialMetaCaretaker {
     const dtos = await obtenerMementosMetaAPI(this.metaId);
     this.historial = dtos.map(MetaAhorroMemento.fromDTO);
     return this.listarHistorial();
-  }
-
-  public async guardarSnapshot(nota?: string): Promise<MetaAhorroMemento> {
-    const dto = await guardarSnapshotMetaAPI(this.metaId, nota);
-    const memento = MetaAhorroMemento.fromDTO(dto);
-    this.agregarMemento(memento);
-    return memento;
-  }
-
-  public async deshacer(): Promise<{
-    memento: MetaAhorroMemento;
-    mensaje: string;
-    meta: any;
-  }> {
-    const res = await deshacerEstadoMetaAPI(this.metaId);
-    const memento = MetaAhorroMemento.fromDTO(res.memento_restaurado);
-    if (this.historial.length > 0) {
-      this.historial.pop();
-    }
-    return {
-      memento,
-      mensaje: res.mensaje,
-      meta: res.meta,
-    };
-  }
-
-  public async restaurarEnIndice(index: number): Promise<{
-    memento: MetaAhorroMemento;
-    mensaje: string;
-    meta: any;
-  }> {
-    const res = await restaurarMementoMetaAPI(this.metaId, index);
-    const memento = MetaAhorroMemento.fromDTO(res.memento_restaurado);
-    this.historial = this.historial.slice(0, index);
-    return {
-      memento,
-      mensaje: res.mensaje,
-      meta: res.meta,
-    };
-  }
-
-  public async cambiarEstado(estado: EstadoMeta) {
-    return cambiarEstadoMetaAPI(this.metaId, estado);
   }
 }

@@ -6,12 +6,9 @@ from schemas.metas import (
     MetaResponse,
     AporteCreate,
     AporteResponse,
-    MementoCreate,
     MementoResponse,
-    RestaurarMementoResponse,
-    EstadoMetaMementoUpdate,
 )
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 
 router = APIRouter(tags=["Metas de Ahorro"])
@@ -49,39 +46,10 @@ def agregar_aporte(meta_id: UUID, aporte: AporteCreate, jwt: str = Depends(obten
 
 
 @router.get("/metas/{meta_id}/mementos", response_model=List[MementoResponse])
-def listar_mementos(meta_id: UUID, jwt: str = Depends(obtener_jwt)):
+def listar_mementos_internos(meta_id: UUID, jwt: str = Depends(obtener_jwt)):
+    """
+    Endpoint interno de solo lectura para consultar el historial de estados Memento
+    administrado por HistorialMetaCaretaker.
+    """
     client = get_client()
     return gestion_metas.obtener_historial_mementos(client, jwt, str(meta_id))
-
-
-@router.post("/metas/{meta_id}/mementos", response_model=MementoResponse, status_code=status.HTTP_201_CREATED)
-def crear_snapshot_memento(
-    meta_id: UUID,
-    body: Optional[MementoCreate] = None,
-    jwt: str = Depends(obtener_jwt),
-):
-    client = get_client()
-    nota = body.nota if body else "Punto de control manual"
-    return gestion_metas.guardar_snapshot_meta(client, jwt, str(meta_id), nota=nota)
-
-
-@router.post("/metas/{meta_id}/deshacer", response_model=RestaurarMementoResponse)
-def deshacer_cambio_meta(meta_id: UUID, jwt: str = Depends(obtener_jwt)):
-    client = get_client()
-    return gestion_metas.deshacer_ultimo_estado(client, jwt, str(meta_id))
-
-
-@router.post("/metas/{meta_id}/restaurar/{index}", response_model=RestaurarMementoResponse)
-def restaurar_estado_meta(meta_id: UUID, index: int, jwt: str = Depends(obtener_jwt)):
-    client = get_client()
-    return gestion_metas.restaurar_estado_por_indice(client, jwt, str(meta_id), index)
-
-
-@router.patch("/metas/{meta_id}/estado", response_model=MetaResponse)
-def actualizar_estado_meta(
-    meta_id: UUID,
-    body: EstadoMetaMementoUpdate,
-    jwt: str = Depends(obtener_jwt),
-):
-    client = get_client()
-    return gestion_metas.cambiar_estado_meta(client, jwt, str(meta_id), body.estado)
